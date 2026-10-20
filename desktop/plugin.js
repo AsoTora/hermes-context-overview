@@ -10,7 +10,13 @@ let gatewaySequence = 0
 const number = value => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
 const text = (value, fallback = '') => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '').slice(0, 500) : fallback
 const fmt = value => value === null ? 'Unknown' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value)
-const percentage = (value, max) => max > 0 && value !== null ? `${(value / max * 100).toFixed(1)}%` : '—'
+// Payload counts are safe integers. Round their exact ratio, not a floating tie.
+const roundedRatio = (value, max, scale) => (BigInt(value) * BigInt(scale) * 2n + BigInt(max)) / (BigInt(max) * 2n)
+const percentage = (value, max) => {
+  if (!(max > 0) || value === null) return '—'
+  const tenths = roundedRatio(value, max, 1000)
+  return `${tenths / 10n}.${tenths % 10n}%`
+}
 const categoryTokens = { system_prompt: 'system', tool_definitions: 'tools', rules: 'rules', skills: 'skills', mcp: 'mcp', subagent_definitions: 'subagents', memory: 'memory', conversation: 'conversation' }
 const color = id => categoryTokens[id] ? `var(--co-${categoryTokens[id]})` : 'var(--co-muted)'
 
@@ -35,7 +41,7 @@ export function normalize(payload) {
   if (source === 'unknown') issues.push('The gateway did not identify occupancy provenance.')
   const known = max > 0 && used !== null
   const free = known ? Math.max(0, max - used) : null
-  const occupiedCells = known ? Math.min(100, Math.round(used / max * 100)) : 0
+  const occupiedCells = known ? Math.min(100, Number(roundedRatio(used, max, 100))) : 0
   return { max, used, free, known, occupiedCells, categories, files, sum, estimate, source, sourceLabel, estimated: source !== 'provider_usage' || payload.context_estimated === true, model: text(payload.model, 'Unknown model') || 'Unknown model', issues: [...new Set(issues)], excess: known ? Math.max(0, used - max) : 0 }
 }
 

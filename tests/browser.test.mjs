@@ -111,6 +111,18 @@ test('one new bottom Context trigger preserves focused conversation, cache indic
   assert.deepEqual(await page.evaluate(() => window.harness.contributions.map(value => value.area)), ['statusBar.right'])
   assert.equal(await cache.evaluate(node => node.outerHTML), cacheMarkup, 'Synthetic cache indicator stays untouched')
 })
+test('decimal half-percent ties round consistently in the summary and categories', async () => {
+  await fresh()
+  await refreshWith({
+    context_max: 500000, context_used: 12750, estimated_total: 12750,
+    context_source: 'provider_usage', model: 'rounding-regression',
+    categories: [{ id: 'conversation', label: 'Conversation', tokens: 12750 }]
+  })
+  await shows('rounding-regression')
+  assert.match(await page.locator('.co-summary').innerText(), /2\.6%/)
+  assert.match(await page.locator('.co-categories').innerText(), /2\.6%/)
+  assert.equal(await page.locator('[data-cell=occupied]').count(), 3)
+})
 test('truthful compact summary, category estimates and collapsed metadata disclosure', async () => {
   await fresh()
   assert.equal(await page.locator('[data-cell]').count(), 100)

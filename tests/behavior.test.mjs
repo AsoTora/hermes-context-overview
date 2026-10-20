@@ -28,11 +28,13 @@ test('authoritative occupancy conserves free budget independently of estimates',
 test('100-cell rounding is proportional, bounded, and zero conversation is preserved', () => {
   for (let used = 0; used <= 2000; used++) {
     const value = normalize({ ...example, context_max: 1000, context_used: used, categories: [{ id: 'conversation', label: 'Conversation', tokens: 0 }] })
-    assert.equal(value.occupiedCells, Math.min(100, Math.round(used / 1000 * 100)))
+    // A 1000-token window has ten tokens per cell: five rounds up, exactly.
+    assert.equal(value.occupiedCells, Math.min(100, Math.floor((used + 5) / 10)))
     assert.equal(value.free, Math.max(0, 1000 - used))
     assert.equal(value.categories[0].tokens, 0)
     assert.ok(value.occupiedCells >= 0 && value.occupiedCells <= 100)
   }
+  assert.equal(normalize({ ...example, context_max: 500000, context_used: 72500 }).occupiedCells, 15)
 })
 test('malformed numeric inputs are not coerced into budget claims', () => {
   for (const bad of [NaN, Infinity, -1, 1.5, '128000', false, null, undefined, {}, Number.MAX_VALUE]) {
