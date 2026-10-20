@@ -31,7 +31,7 @@ async function inventory(directory) {
 }
 await inventory(root)
 files.sort((a, b) => a.path.localeCompare(b.path))
-const receipt = { generatedAt: new Date().toISOString(), node: process.version, platform: process.platform, runtimeReference: 'd923a5eb487a17c0a68801bba9ef0f56c81040a8', evidenceLevel: 'Actual plugin entry with synthetic SDK + real React/Query + Chromium; live Desktop unknown', commands: results, files }
+const receipt = { generatedAt: new Date().toISOString(), node: process.version, platform: process.platform, runtimeReference: 'd923a5eb487a17c0a68801bba9ef0f56c81040a8', evidenceLevel: 'Actual composer contribution with synthetic SDK/focus routing + real React/Query/Radix + Chromium; live Desktop unknown', commands: results, files }
 await writeFile(resolve(local, 'evidence.json'), `${JSON.stringify(receipt, null, 2)}\n`)
 console.log(JSON.stringify({ commands: results, receipt: '.local/evidence.json', publishableFiles: files.length }, null, 2))
 if (results.some(result => result.exitCode !== 0)) process.exitCode = 1

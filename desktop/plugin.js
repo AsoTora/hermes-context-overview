@@ -1,11 +1,9 @@
 import * as sdk from '@hermes/plugin-sdk'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
-const { host, useValue, useQuery, atom, Button } = sdk
+const { host, useValue, useQuery, atom, Button, Popover, PopoverTrigger, PopoverContent } = sdk
 const ID = 'hermes-context-overview'
-const PATH = '/context-overview'
-const revision = atom(0)
 const epochs = atom(0)
 const gateways = new WeakMap()
 let gatewaySequence = 0
@@ -49,20 +47,16 @@ function gatewayKey() {
 }
 function snapshot() {
   const state = host.state
-  const session = (state.focusedSessionId ?? state.activeSessionId).get()
+  const session = state.focusedSessionId?.get()
   const profile = state.profile.get()
   const connection = state.connectionId?.get() ?? 'legacy'
   const owner = state.focusedSessionOwner?.get()
   const focusedProfile = owner?.profile ?? state.focusedSessionProfile?.get() ?? profile
-  return { session, profile, connection, owner, focusedProfile, gateway: state.gateway.get(), instance: gatewayKey(), epoch: epochs.get(), revision: revision.get() }
+  return { session, profile, connection, owner, focusedProfile, gateway: state.gateway.get(), instance: gatewayKey(), epoch: epochs.get() }
 }
-const stamp = value => JSON.stringify([value.connection, value.profile, value.owner?.connectionId, value.focusedProfile, value.session, value.gateway, value.instance, value.epoch, value.revision])
+const stamp = value => JSON.stringify([value.connection, value.profile, value.owner?.connectionId, value.focusedProfile, value.session, value.gateway, value.instance, value.epoch])
 function routeFor(scope) {
-  if (host.state.focusedSessionOwner && !scope.owner) return { blocked: 'Session ownership is unresolved. Focus a connected conversation and try again.' }
-  if (!host.state.focusedSessionOwner) {
-    const sources = new Set((host.profileRoutes?.() ?? []).filter(route => route.profile === scope.focusedProfile || route.targetProfile === scope.focusedProfile).map(route => route.connectionId))
-    if (sources.size > 1) return { blocked: 'This SDK lacks the session owner metadata required to distinguish multiple connections. Upgrade Hermes Desktop.' }
-  }
+  if (!host.state.focusedSessionId || !host.state.focusedSessionOwner || !scope.owner) return { blocked: 'Session ownership is unresolved. A Desktop SDK with focused session ownership is required.' }
   const connectionId = scope.owner?.connectionId ?? scope.connection
   if (connectionId === scope.connection && scope.focusedProfile === scope.profile) return { ambient: true }
   const routes = host.profileRoutes?.() ?? []
@@ -71,112 +65,124 @@ function routeFor(scope) {
   return { blocked: 'The focused session has no unique connection/profile route. Return to its owning profile to view context.' }
 }
 
-function Metric({ label, value, detail }) {
-  return jsxs('div', { className: 'co-metric', children: [jsx('div', { className: 'co-muted', children: label }), jsx('strong', { children: value }), jsx('div', { className: 'co-muted', children: detail })] })
-}
-function Table({ caption, headers, rows }) {
-  return jsx('div', { className: 'co-table-wrap', tabIndex: 0, role: 'region', 'aria-label': caption, children: jsxs('table', { children: [jsx('caption', { children: caption }), jsx('thead', { children: jsx('tr', { children: headers.map(header => jsx('th', { scope: 'col', children: header }, header)) }) }), jsx('tbody', { children: rows.map((row, index) => jsx('tr', { children: row.map((cell, column) => jsx(column === 0 ? 'th' : 'td', { scope: column === 0 ? 'row' : undefined, children: cell }, column)) }, index)) })] }) })
-}
 function Budget({ value }) {
-  return jsxs('section', { className: 'co-card', 'aria-label': 'Context budget', children: [
-    jsxs('div', { className: 'co-section-title', children: [jsx('h2', { children: 'Model window' }), jsx('span', { className: 'co-muted', children: value.known ? `${percentage(value.used, value.max)} occupied` : 'Budget unknown' })] }),
+  return jsxs('section', { 'aria-label': 'Context budget', children: [
+    jsxs('p', { className: 'co-summary', children: [jsx('strong', { children: `${value.estimated ? '≈ ' : ''}${fmt(value.used)} / ${value.max > 0 ? fmt(value.max) : 'Unknown'}` }), ` tokens · ${percentage(value.used, value.max)}`] }),
+    jsx('p', { className: 'co-muted', children: `${fmt(value.free)} free · ${value.model} · ${value.sourceLabel}` }),
     jsx('div', { className: 'co-grid', role: 'img', 'aria-label': value.known ? `${fmt(value.used)} of ${fmt(value.max)} tokens occupied; ${fmt(value.free)} free. 100 cells rounded to nearest percent.` : '100 cells: budget unknown, not free.', children: Array.from({ length: 100 }, (_, index) => jsx('span', { 'aria-hidden': true, 'data-cell': !value.known ? 'unknown' : index < value.occupiedCells ? 'occupied' : 'free', className: !value.known ? 'co-cell co-unknown' : index < value.occupiedCells ? 'co-cell co-occupied' : 'co-cell' }, index)) }),
-    jsxs('p', { className: 'co-legend', children: [jsx('span', { children: '■ Occupied' }), jsx('span', { children: '□ Free' }), jsx('span', { children: '▨ Unknown' }), jsx('span', { className: 'co-muted', children: '1 cell ≈ 1% of window · rounded' })] }),
-    jsx('p', { className: 'co-muted', children: 'This grid shows overall occupancy, not estimated category attribution. Category estimates below are independent and are never stretched to match the provider total.' }),
-    value.excess > 0 && jsx('p', { role: 'alert', children: `Over budget by ${fmt(value.excess)} tokens. The grid is capped at 100%; no free budget remains.` })
+    jsx('p', { className: 'co-muted', children: '■ Occupied · □ Free · ▨ Unknown · 1 cell ≈ 1% (rounded)' }),
+    value.excess > 0 && jsx('p', { role: 'alert', children: `Over budget by ${fmt(value.excess)} tokens. Grid capped at 100%.` })
   ] })
 }
 function Details({ value }) {
-  return jsxs('div', { className: 'co-body', children: [
-    jsx('div', { className: 'co-metrics', children: [jsx(Metric, { label: 'Occupied tokens', value: `${value.estimated ? '≈ ' : ''}${fmt(value.used)}`, detail: value.sourceLabel }), jsx(Metric, { label: 'Model capacity', value: value.max > 0 ? fmt(value.max) : 'Unknown', detail: value.model }), jsx(Metric, { label: 'Free budget', value: fmt(value.free), detail: 'Window minus overall occupancy' })] }),
+  return jsxs('div', { children: [
     jsx(Budget, { value }),
-    jsx('section', { className: 'co-card', children: jsxs('div', { children: [jsx('h2', { children: 'Estimated allocation' }), jsx('p', { className: 'co-muted', children: `Category sum: ${fmt(value.sum)} tokens · Reported estimate: ${fmt(value.estimate)} tokens. All category counts are approximate, not provider tokenizer measurements.` }),
-      value.known && value.sum !== null && value.sum !== value.used && jsx('p', { className: 'co-note', children: `Estimates differ from overall occupancy by ${fmt(Math.abs(value.sum - value.used))} tokens (${value.sum > value.used ? 'higher' : 'lower'}). This is estimate drift, not additional free or used budget.` }),
-      value.categories.length ? jsx(Table, { caption: 'Context categories', headers: ['Category', 'Estimated tokens', '% of model window'], rows: value.categories.map(row => [jsxs('span', { className: 'co-category', children: [jsx('span', { className: 'co-swatch', style: { background: color(row.id) }, 'aria-hidden': true }), row.label] }), `≈ ${fmt(row.tokens)}`, percentage(row.tokens, value.max)]) }) : jsx('p', { children: 'No category estimates are available yet. A resumed or rebuilding session can report occupancy before an agent breakdown exists.' }),
-      jsx('p', { className: 'co-muted', children: 'Optional categories may be absent. The RPC reports aggregate tools/MCP, skills, memory, system prompt and conversation costs, not individual tool/skill counts or raw prompt content.' })] }) }),
-    jsx('section', { className: 'co-card', children: jsxs('div', { children: [jsx('h2', { children: 'Context files · metadata only' }), jsx('p', { className: 'co-muted', children: 'Gateway-reported load status and size. Files are not opened by this plugin; these estimates are not added to the allocation again.' }), value.files.length ? jsx(Table, { caption: 'Context file manifest', headers: ['Source / path', 'Load state', 'Status', 'Characters', 'Est. tokens'], rows: value.files.map(file => [jsxs('span', { children: [jsx('strong', { children: file.label }), jsx('code', { children: file.path || 'No path supplied' })] }), file.loaded, file.status, fmt(file.chars), file.tokens === null ? 'Unknown' : `≈ ${fmt(file.tokens)}`]) }) : jsx('p', { children: 'No context-file metadata was supplied.' })] }) }),
-    value.issues.length > 0 && jsx('aside', { className: 'co-card', 'aria-label': 'Data quality notes', children: jsxs('div', { children: [jsx('h2', { children: 'Data quality' }), jsx('ul', { children: value.issues.map(issue => jsx('li', { children: issue }, issue)) })] }) })
+    jsx('h3', { children: 'Estimated allocation' }),
+    value.categories.length ? jsx('ul', { className: 'co-categories', 'aria-label': 'Context categories', children: value.categories.map(row => jsxs('li', { children: [jsxs('span', { className: 'co-category', children: [jsx('span', { className: 'co-swatch', style: { background: color(row.id) }, 'aria-hidden': true }), row.label] }), jsx('span', { children: `≈ ${fmt(row.tokens)} · ${percentage(row.tokens, value.max)}` })] }, row.key)) }) : jsx('p', { children: 'No category estimates are available yet. A resumed or rebuilding session may not have a breakdown.' }),
+    jsxs('details', { children: [jsx('summary', { children: 'How estimates differ' }), jsx('p', { className: 'co-muted', children: `Category sum: ${fmt(value.sum)} · Reported estimate: ${fmt(value.estimate)}. Category estimates are independent of overall occupancy and never rescaled to match it. Optional categories may be absent.` }), value.known && value.sum !== null && value.sum !== value.used && jsx('p', { className: 'co-muted', children: `Estimates differ from overall occupancy by ${fmt(Math.abs(value.sum - value.used))} tokens (${value.sum > value.used ? 'higher' : 'lower'}). This is estimate drift, not additional budget.` })] }),
+    jsxs('details', { children: [jsx('summary', { children: 'Context files · metadata only' }), jsx('p', { className: 'co-muted', children: 'Load status and size only. Files are not opened; estimates are not added again.' }), value.files.length ? jsx('ul', { className: 'co-files', children: value.files.map((file, index) => jsxs('li', { children: [jsx('strong', { children: file.label }), jsx('code', { children: file.path || 'No path supplied' }), jsx('p', { className: 'co-muted', children: `${file.loaded} · ${file.status} · ${fmt(file.chars)} chars · ≈ ${fmt(file.tokens)} tokens` })] }, index)) }) : jsx('p', { children: 'No context-file metadata was supplied.' })] }),
+    value.issues.length > 0 && jsxs('details', { children: [jsx('summary', { children: 'Data quality notes' }), jsx('ul', { children: value.issues.map(issue => jsx('li', { children: issue }, issue)) })] })
   ] })
 }
-
-export function Overview() {
-  useValue(host.state.focusedSessionId ?? host.state.activeSessionId)
-  useValue(host.state.profile)
-  useValue(host.state.connectionId ?? host.state.profile)
-  useValue(host.state.focusedSessionOwner ?? host.state.focusedSessionProfile ?? host.state.profile)
-  useValue(host.state.gateway)
-  const busy = useValue(host.state.busy)
-  useValue(revision)
-  useValue(epochs)
-  const scope = snapshot()
+function sessionBusy(scope) {
+  const map = host.state.busyBySession?.get()
+  // The focused fallback is safe ONLY while the captured owner still matches.
+  return map && Object.hasOwn(map, scope.session) ? map[scope.session] === true : host.state.busy.get()
+}
+function ContextPanel({ scope }) {
+  useValue(host.state.busyBySession ?? host.state.busy)
+  useValue(host.state.busy)
+  const [revision, setRevision] = useState(0)
   const identity = stamp(scope)
+  const busy = sessionBusy(scope)
   const route = routeFor(scope)
-  const enabled = Boolean(scope.session && scope.gateway === 'open' && !busy && !route.blocked)
+  const valid = () => identity === stamp(snapshot())
+  const enabled = Boolean(valid() && scope.session && scope.gateway === 'open' && !busy && !route.blocked)
   const query = useQuery({
-    queryKey: [ID, identity, busy],
-    enabled,
+    queryKey: [ID, identity, busy, revision], enabled,
     queryFn: async ({ signal }) => {
-      if (signal.aborted || identity !== stamp(snapshot())) throw new Error('scope-changed')
+      if (signal.aborted || !valid() || sessionBusy(scope)) throw new Error('scope-changed')
+      // Resolve again at dispatch: a disconnected profile descriptor is not authority.
+      const target = routeFor(scope)
+      if (target.blocked) throw new Error('scope-changed')
       const params = { session_id: scope.session }
-      const payload = route.ambient ? await host.request('session.context_breakdown', params, 15000) : await host.requestProfile(route.route, 'session.context_breakdown', params, 15000)
-      if (signal.aborted || identity !== stamp(snapshot())) throw new Error('scope-changed')
+      const payload = target.ambient ? await host.request('session.context_breakdown', params, 15000) : await host.requestProfile(target.route, 'session.context_breakdown', params, 15000)
+      if (signal.aborted || !valid() || sessionBusy(scope)) throw new Error('scope-changed')
       const value = normalize(payload)
       if (!value.max) throw new Error('missing-window')
       return value
     },
-    staleTime: 15000,
-    gcTime: 0,
-    retry: (count, error) => count < 2 && ![-32601, 4004].includes(error?.code) && !/method.*(not found|unknown)|unknown method/i.test(error?.message ?? ''),
+    staleTime: 15000, gcTime: 0,
+    retry: (count, error) => valid() && !sessionBusy(scope) && count < 2 && error?.message !== 'scope-changed' && ![-32601, 4004].includes(error?.code) && !/method.*(not found|unknown)|unknown method/i.test(error?.message ?? ''),
     retryDelay: count => [1000, 4000][Math.min(count, 1)],
     refetchInterval: query => query.state.status === 'error' ? false : 60000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: false,
-    placeholderData: undefined
+    refetchIntervalInBackground: false, refetchOnWindowFocus: false, placeholderData: undefined
   })
   useEffect(() => {
     if (!enabled) return
     return host.onEvent('*', event => {
       const payload = event?.payload ?? {}
       const session = event?.session_id ?? payload.session_id
-      if (session !== (host.state.focusedSessionId ?? host.state.activeSessionId).get()) return
-      if (event.type === 'session.reclaimed' || event.type === 'message.complete' || (event.type === 'status.update' && ['compacting', 'compressing', 'compacted', 'ready'].includes(payload.kind))) revision.set(revision.get() + 1)
+      if (!valid() || session !== scope.session) return
+      // Events with explicit foreign provenance must not invalidate this snapshot.
+      if (event.connectionId && event.connectionId !== scope.owner?.connectionId) return
+      if (event.profile && event.profile !== scope.focusedProfile) return
+      if (event.type === 'session.reclaimed' || event.type === 'message.complete' || (event.type === 'status.update' && ['compacting', 'compressing', 'compacted', 'ready'].includes(payload.kind))) setRevision(value => value + 1)
     })
   }, [enabled, identity])
-  const refresh = () => { if (host.state.gateway.get() === 'open' && !host.state.busy.get()) revision.set(revision.get() + 1) }
+  const refresh = () => { if (valid() && !sessionBusy(scope)) setRevision(value => value + 1) }
   let message = null
-  if (!scope.session) message = 'No focused session. Open a conversation to inspect its context.'
-  else if (scope.gateway !== 'open') message = 'Gateway disconnected. Context is hidden until the connection is restored.'
-  else if (busy) message = 'Session is busy. Context will refresh when the turn ends; no mid-turn estimate is requested.'
+  if (!scope.session) message = 'No session yet. Send a message in this conversation first.'
+  else if (scope.gateway !== 'open') message = 'Gateway disconnected. Reopen Context after reconnecting.'
   else if (route.blocked) message = route.blocked
-  else if (query.isFetching) message = 'Loading context breakdown…'
-  else if (query.isError) message = query.error?.message === 'missing-window' ? 'No model window is available yet. Bounded retries finished; refresh after the runtime is ready.' : [-32601, 4004].includes(query.error?.code) || /method.*(not found|unknown)|unknown method/i.test(query.error?.message ?? '') ? 'Context breakdown is unavailable on this gateway. Hermes ≥0.22.2 with session.context_breakdown and the Desktop SDK is required.' : 'Context could not be refreshed. No previous snapshot is shown. Check the gateway and retry.'
-  return jsxs('main', { className: 'hermes-context-overview', 'aria-label': 'Context Overview', children: [
-    jsx('style', { children: styles }),
-    jsxs('header', { className: 'co-header', children: [jsxs('div', { children: [jsx('p', { className: 'co-eyebrow', children: 'CONTEXT OVERVIEW' }), jsx('h1', { children: host.state.focusedSessionId ? 'Focused session' : 'Active session' }), jsx('p', { className: 'co-muted', children: 'Token budget, estimated composition and context-file provenance.' }), jsx('code', { children: scope.session ? `${text(scope.focusedProfile)} · ${text(scope.session)}` : 'No session selected' })] }), jsx(Button, { type: 'button', variant: 'outline', size: 'sm', disabled: !scope.session || scope.gateway !== 'open' || busy || query.isFetching || Boolean(route.blocked), onClick: refresh, children: 'Refresh context' })] }),
-    message ? jsx('div', { className: 'co-card co-state', role: query.isError ? 'alert' : 'status', children: message }) : query.data && jsx(Details, { value: query.data }),
-    jsx('footer', { className: 'co-muted', children: 'Read-only · follows focused conversation · idle refresh every 60 seconds · no raw prompt or message access' })
+  else if (busy) message = 'Session is busy. Context will refresh when this turn ends.'
+  else if (query.isFetching || query.isPending) message = 'Loading context breakdown…'
+  if (!message && query.isError) message = query.error?.message === 'missing-window' ? 'No model window is available yet. Bounded retries finished; refresh after the runtime is ready.' : [-32601, 4004].includes(query.error?.code) || /method.*(not found|unknown)|unknown method/i.test(query.error?.message ?? '') ? 'Context breakdown is unavailable on this gateway. Hermes ≥0.22.2 with session.context_breakdown is required.' : 'Context could not be refreshed. No previous snapshot is shown. Check the gateway and retry.'
+  return jsxs('div', { children: [
+    jsxs('header', { className: 'co-header', children: [jsx('h2', { children: 'Conversation context' }), jsx(Button, { type: 'button', variant: 'ghost', size: 'sm', disabled: !enabled || query.isFetching, onClick: refresh, children: 'Refresh context' })] }),
+    jsx('code', { className: 'co-muted', children: `${text(scope.focusedProfile)} · ${text(scope.session, 'New conversation')}` }),
+    message ? jsx('p', { role: query.isError ? 'alert' : 'status', children: message }) : query.data && jsx(Details, { value: query.data }),
+    jsx('p', { className: 'co-muted', children: 'Read-only · updates only while open · no prompt/message bodies' })
+  ] })
+}
+
+export function ContextControl() {
+  useValue(host.state.focusedSessionId ?? host.state.activeSessionId)
+  useValue(host.state.profile)
+  useValue(host.state.connectionId ?? host.state.profile)
+  useValue(host.state.focusedSessionOwner ?? host.state.profile)
+  useValue(host.state.gateway)
+  useValue(epochs)
+  const [scope, setScope] = useState(null)
+  const activation = useRef(null)
+  const current = stamp(snapshot())
+  const valid = Boolean(scope && stamp(scope) === current)
+  useEffect(() => { if (scope && !valid) setScope(null) }, [current, valid, scope])
+  // Core window capture pointerdown/focusin routes the owning tree group BEFORE
+  // these handlers. Never display global usage in each closed composer instance.
+  const arm = () => { activation.current = snapshot() }
+  const openChange = open => {
+    if (!open) { setScope(null); activation.current = null; return }
+    const captured = activation.current
+    if (captured && stamp(captured) === stamp(snapshot())) setScope(captured)
+  }
+  return jsxs(Popover, { open: valid, onOpenChange: openChange, children: [
+    jsx(PopoverTrigger, { asChild: true, children: jsx(Button, { type: 'button', variant: 'ghost', size: 'sm', onPointerDown: arm, onFocus: arm, onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') arm() }, children: 'Context' }) }),
+    valid && jsxs(PopoverContent, { side: 'top', align: 'end', collisionPadding: 8, className: 'hermes-context-overview', 'aria-label': 'Conversation context', onCloseAutoFocus: event => { if (stamp(scope) !== stamp(snapshot())) event.preventDefault() }, children: [jsx('style', { children: styles }), jsx(ContextPanel, { scope }, stamp(scope))] })
   ] })
 }
 
 const styles = `
-.hermes-context-overview{box-sizing:border-box;height:100%;overflow:auto;padding:clamp(16px,3vw,36px);color:var(--ui-text-primary);font-size:14px;line-height:1.55;container-type:inline-size}
-.hermes-context-overview *{box-sizing:border-box}.hermes-context-overview .co-body,.hermes-context-overview .co-card,.hermes-context-overview .co-table-wrap{min-width:0}.hermes-context-overview h1{font-size:28px;line-height:1.2;letter-spacing:-.025em;margin:5px 0 10px}.hermes-context-overview h2{font-size:16px;margin:0 0 8px}.hermes-context-overview p{margin:8px 0}.hermes-context-overview code{display:block;font-size:12px;overflow-wrap:anywhere;white-space:normal;color:var(--ui-text-secondary)}
-.hermes-context-overview .co-header{display:flex;gap:20px;justify-content:space-between;align-items:start;margin:0 auto 24px;max-width:1120px}.hermes-context-overview .co-eyebrow{font-size:11px;letter-spacing:.16em;font-weight:650;color:var(--ui-text-secondary)}.hermes-context-overview .co-muted{color:var(--ui-text-secondary);font-size:12px}.hermes-context-overview .co-body{display:grid;gap:18px;max-width:1120px;margin:auto}
-.hermes-context-overview .co-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}.hermes-context-overview .co-metric,.hermes-context-overview .co-card{border:1px solid var(--ui-stroke-secondary);border-radius:12px;padding:20px;background:var(--ui-bg-card)}.hermes-context-overview .co-metric strong{display:block;font-size:28px;font-variant-numeric:tabular-nums;margin:5px 0}.hermes-context-overview .co-section-title{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}.hermes-context-overview .co-grid{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:5px;margin:16px 0}.hermes-context-overview .co-cell{height:18px;border:1px solid var(--ui-stroke-secondary);border-radius:3px;background:var(--ui-bg-elevated)}.hermes-context-overview .co-occupied{background:var(--ui-accent);border-color:var(--ui-accent)}.hermes-context-overview .co-unknown{background:repeating-linear-gradient(135deg,transparent,transparent 3px,var(--ui-stroke-secondary) 3px,var(--ui-stroke-secondary) 5px)}.hermes-context-overview .co-legend{display:flex;flex-wrap:wrap;gap:16px;font-size:12px}.hermes-context-overview .co-note{padding:10px 12px;border-left:3px solid var(--ui-accent);background:var(--ui-bg-secondary);font-size:12px}
-.hermes-context-overview .co-table-wrap{overflow-x:auto;max-width:100%;margin-top:14px}.hermes-context-overview table{border-collapse:collapse;width:100%;font-size:13px}.hermes-context-overview caption{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ui-text-secondary);padding-bottom:8px}.hermes-context-overview th,.hermes-context-overview td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--ui-stroke-secondary);vertical-align:top;overflow-wrap:anywhere}.hermes-context-overview thead th{font-size:11px;color:var(--ui-text-secondary);font-weight:500}.hermes-context-overview tbody th{font-weight:500}.hermes-context-overview td{font-variant-numeric:tabular-nums}.hermes-context-overview .co-category{display:flex;align-items:center;gap:9px}.hermes-context-overview .co-swatch{width:9px;height:9px;border-radius:2px;flex:none}.hermes-context-overview .co-state{max-width:1120px;margin:auto;min-height:130px;display:flex;align-items:center}.hermes-context-overview footer{max-width:1120px;margin:24px auto 0}.hermes-context-overview :focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px}
-@container(max-width:540px){.hermes-context-overview .co-header{flex-direction:column}.hermes-context-overview .co-grid{grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}.hermes-context-overview .co-card{padding:14px}.hermes-context-overview .co-metric strong{font-size:24px}.hermes-context-overview th,.hermes-context-overview td{padding:9px 5px}.hermes-context-overview table{min-width:420px}}
+.hermes-context-overview{box-sizing:border-box;width:min(380px,calc(100vw - 24px));max-height:min(620px,var(--radix-popover-content-available-height,75vh));overflow:auto;overscroll-behavior:contain;padding:14px;color:var(--ui-text-primary);background:var(--ui-bg-elevated);border:1px solid var(--ui-stroke-secondary);border-radius:10px;font-size:12px;line-height:1.5}
+.hermes-context-overview *{box-sizing:border-box}.hermes-context-overview h2{font-size:14px;margin:0}.hermes-context-overview h3{font-size:12px;margin:16px 0 6px}.hermes-context-overview p{margin:8px 0}.hermes-context-overview code{display:block;overflow-wrap:anywhere;white-space:normal;font-size:11px}.hermes-context-overview .co-header{display:flex;gap:12px;align-items:center;justify-content:space-between}.hermes-context-overview .co-muted{color:var(--ui-text-secondary);font-size:11px}.hermes-context-overview .co-summary{margin-top:14px;font-variant-numeric:tabular-nums}.hermes-context-overview .co-summary strong{font-size:16px}.hermes-context-overview .co-grid{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:3px;margin:12px 0}.hermes-context-overview .co-cell{height:9px;border:1px solid var(--ui-stroke-secondary);border-radius:2px;background:var(--ui-editor-surface-background)}.hermes-context-overview .co-occupied{background:var(--ui-accent);border-color:var(--ui-accent)}.hermes-context-overview .co-unknown{background:repeating-linear-gradient(135deg,transparent,transparent 3px,var(--ui-stroke-secondary) 3px,var(--ui-stroke-secondary) 5px)}.hermes-context-overview .co-categories{list-style:none;margin:0;padding:0}.hermes-context-overview .co-categories li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--ui-stroke-secondary);padding:5px 0;font-variant-numeric:tabular-nums}.hermes-context-overview .co-category{display:flex;align-items:center;gap:6px;min-width:0;overflow-wrap:anywhere}.hermes-context-overview .co-swatch{width:7px;height:7px;border-radius:2px;flex:none}.hermes-context-overview details{border-top:1px solid var(--ui-stroke-secondary);padding-top:8px;margin-top:10px}.hermes-context-overview summary{cursor:pointer;color:var(--ui-text-secondary)}.hermes-context-overview .co-files{padding-left:16px}.hermes-context-overview :focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}
 `
 
 export default {
-  id: ID,
-  name: 'Context Overview',
-  defaultEnabled: true,
+  id: ID, name: 'Context Overview', defaultEnabled: true,
   register(ctx) {
     for (const state of [host.state.connectionId, host.state.profile, host.state.gateway]) {
       if (state?.listen) ctx.onDispose(state.listen(() => epochs.set(epochs.get() + 1)))
     }
-    ctx.register({ id: 'page', area: sdk.ROUTES_AREA, data: { path: PATH }, render: () => jsx(Overview, {}) })
-    ctx.register({ id: 'nav', area: sdk.SIDEBAR_NAV_AREA, data: { path: PATH, label: 'Context Overview', codicon: 'graph' } })
-    ctx.register({ id: 'open', area: sdk.PALETTE_AREA, data: { id: `${ID}.open`, label: 'Open Context Overview', keywords: ['context', 'tokens', 'budget', 'memory', 'mcp'], run: () => host.navigate(PATH) } })
+    ctx.register({ id: 'context', area: sdk.COMPOSER_AREAS.actions, render: () => jsx(ContextControl, {}) })
   }
 }

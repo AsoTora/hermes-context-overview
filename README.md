@@ -1,76 +1,79 @@
 # Context Overview for Hermes Desktop
 
-A native, persistent full-page context inspector: **100-cell model budget**, authoritative occupancy/free space, estimated category costs, and context-file load provenance. Read-only, no runtime dependencies, no Python backend, no new collector.
+**Version 1.1.0:** a compact **Context** control beside each conversation’s composer controls. Open it to inspect that conversation’s token budget without leaving the chat. There is no sidebar page, command-palette navigation, global top box or new collector.
 
-Open **Context Overview** in the sidebar or **Open Context Overview** in the command palette. The page follows the focused conversation (including split-session tiles); Refresh updates the same session, not a copied transcript.
+![Synthetic browser harness: two conversation composers and one local Context popover](docs/screenshots/harness-dark-1280.png)
 
-![Synthetic SDK harness, dark wide layout](docs/screenshots/harness-dark-1280.png)
+**Screenshot disclosure:** these are the actual plugin entry rendered in a **synthetic SDK browser harness**, not live Hermes Desktop. All conversations, identifiers, paths and budgets are public demo fixtures. [Narrow light](docs/screenshots/harness-light-390.png), [wide light](docs/screenshots/harness-light-1280.png), [narrow dark](docs/screenshots/harness-dark-390.png).
 
-**Screenshot disclosure:** these images show the actual plugin entry rendered in a **synthetic SDK browser harness**, not an installed live Hermes Desktop app. All identifiers, paths, model names, and numbers are public synthetic examples. [Narrow light](docs/screenshots/harness-light-390.png), [wide light](docs/screenshots/harness-light-1280.png), [narrow dark](docs/screenshots/harness-dark-390.png).
+## Use
+
+Click **Context** beside the model/send controls, or focus the button and press Enter/Space. A native SDK popover opens above that composer, with:
+
+- Occupied / capacity tokens, percent occupied, free budget, model and occupancy provenance.
+- A **100-cell** overall occupancy grid and compact estimated category list.
+- Optional, initially collapsed explanations, context-file metadata and data-quality notes.
+- An explicit refresh button; idle refresh every 60 seconds **only while open**.
+
+Escape or an outside interaction dismisses it. Escape returns focus to the trigger. Moving to another conversation, changing owner/profile/connection or reconnecting closes the old popup rather than silently retargeting it. Open Context again when needed. Busy sessions show a waiting state instead of mid-turn estimates. A fresh conversation without a runtime session shows an empty state.
+
+## Per-conversation ownership
+
+`composer.actions` mounts the control separately in every composer. Its render callback does **not** receive a session ID, so a closed button deliberately says only **Context**: it never duplicates global focused-session numbers across all conversations.
+
+Binding happens at user activation, after the host’s window-capture pointer/focus routing has selected the owning conversation. The instance captures the public `focusedSessionId` and connection-qualified `focusedSessionOwner`, ambient connection/profile, gateway identity and lifecycle epoch. It keeps that identity fixed until dismissal. Any identity change immediately gates content and unmounts the query; pending old-scope responses cannot paint a new conversation. Forced dismissal suppresses the old popover’s focus return so it cannot steal focus back from the newly activated composer.
+
+RPC dispatch uses the exact `profileRoutes()` descriptor plus `requestProfile()` for a foreign owner, or `host.request()` only for the matching ambient owner. Missing/ambiguous routes or owner metadata fail closed. Busy state comes from `busyBySession[capturedSession]` when available, otherwise the focused busy atom only while captured identity still matches. Other sessions’ busy updates do not hide or refetch this popup.
+
+This depends on the inspected Desktop tree’s existing **window-capture `pointerdown` / `focusin` ownership routing**. It does not invent session render props, import private composer hooks, scan host DOM, or patch core. The source references and the explicitly emulated host seam are recorded in [verification](docs/verification.md). Browser tests are not proof of live native integration or support for other host layouts that omit that routing.
 
 ## What the numbers mean
 
-- **Occupied tokens and free budget** use `context_used` and `context_max` from `session.context_breakdown`. Source is labeled as provider usage, provider usage plus estimated delta, local estimate, or unknown. Free space never comes from the category sum.
-- **100 cells** represent overall model-window occupancy/free space, rounded to nearest 1%. Cells are not attributed to categories: doing so would imply estimated categories were measured provider totals. Over-budget values cap the picture at 100% but keep an explicit excess warning. Unknown budget is never painted as free.
-- **Estimated allocation** preserves gateway category estimates and order, including a measured zero-token conversation row. Percentages mean **percent of the model window**, not percent of the category sum. An absent optional category is not an invented zero. The reported estimate total, row sum and occupancy remain separate; differences are explained, never silently rescaled.
-- **Context files** show only reported label, path, character count, token estimate, loaded flag and status. File estimates are not added to the category total again. A missing manifest means no metadata was supplied, not that no files exist.
-- Individual tool names/counts, per-skill bodies/costs, raw system prompt, message bodies, and memory contents are **not supplied by this RPC** and are not fabricated or fetched by this plugin.
+- **Occupied/free:** `context_used` and `context_max` from the existing metadata-only `session.context_breakdown` RPC. Provenance is provider usage, provider usage plus estimated delta, local estimate, or unknown. Free budget never comes from estimated category totals.
+- **100 cells:** overall window occupancy, rounded to nearest 1%; not estimated category attribution. Over-budget pictures cap at 100% with an excess warning. Unknown occupancy is never painted as free.
+- **Estimated allocation:** gateway counts and order are preserved, including zero-token rows. Percentages mean percent of the model window. Missing optional categories are not invented zeros. Row sum, reported estimate and occupancy remain separate and are never stretched to match.
+- **Context files:** reported label/path, character count, token estimate, loaded flag and status only. The plugin does not open files or add file estimates to categories again.
+- Raw system prompts, messages, memory contents, individual tool/skill costs and session titles are not fetched or fabricated. The existing conversation heading provides the name; the popup shows profile/runtime ID as secondary metadata.
 
-A session title is not exposed by the inspected readonly SDK state or this RPC. The heading therefore says **Focused session** (or **Active session** on older SDKs), with owning profile and runtime ID as secondary metadata. No message previews or session-body requests are used to synthesize a name.
+## Requirements
 
-## Requirements and compatibility
+`plugin.yaml` declares **Hermes >=0.22.2** as the RPC baseline, not a guarantee that every older Desktop build has the necessary SDK. The host must expose `COMPOSER_AREAS.actions`, native `Button`/`Popover*`, React Query, `focusedSessionId`, `focusedSessionOwner`, connection/profile/gateway state and the existing tree ownership routing. Foreign-owner sessions also need `profileRoutes()` / `requestProfile()`.
 
-`plugin.yaml` declares **Hermes >=0.22.2**. This is a necessary baseline, not a guarantee that every historical Desktop build has the required surface. The host must provide the native Desktop SDK, route/sidebar/palette contributions, React Query, and `session.context_breakdown`.
-
-Implementation was checked against the installed runtime at `d923a5eb487a17c0a68801bba9ef0f56c81040a8` and the current official SDK reference supplied during development. The plugin uses namespace imports and feature detection for newer state:
-
-- `focusedSessionId`, falling back to `activeSessionId` only when the focused atom is absent;
-- connection-qualified `focusedSessionOwner`, `connectionId` and owning profile;
-- exact descriptors from `profileRoutes()` with `requestProfile()` for a split session on another connection/profile;
-- `host.request()` for the matching ambient gateway;
-- optional `getGateway()` object identity plus connection/profile/gateway lifecycle generations to isolate reconnects.
-
-An unresolved owner or missing/ambiguous remote route fails closed. Missing RPC methods produce an inline compatibility message, with no retry storm. Zero/missing model windows retry twice, then show no-data rather than stale numbers. No legacy collector or private core import is used as a fallback.
+The implementation was checked against runtime `d923a5eb487a17c0a68801bba9ef0f56c81040a8` and the SDK reference supplied during development. Missing RPC methods show a compatibility message without retries. Transient errors and missing model windows retry twice, then stop; no stale budget is presented. There is no legacy active-session fallback without focused ownership.
 
 ## Install / enable / remove
 
-Installation and confirmed live rendering are separate from source-level testing. The browser harness does not establish that a running Desktop window loaded the plugin; no application restart is required by this plugin.
-
-For a standalone native disk installation, copy only `desktop/plugin.js` to:
+Source validation does not install the plugin or establish that Desktop loaded it. For a standalone disk installation, place `desktop/plugin.js` at:
 
 ```text
 $HERMES_HOME/desktop-plugins/hermes-context-overview/plugin.js
 ```
 
-The containing folder must match the plugin ID. A standalone disk installation defaults to enabled (`defaultEnabled: true`), while respecting any existing explicit disable choice. If it does not appear, use **Reload desktop plugins** in the command palette and check **Context Overview** in Desktop's Plugins UI. The unified package (`plugin.yaml` plus `desktop/plugin.js`) can instead be installed using `hermes plugins install AsoTora/hermes-context-overview --enable`. Package-managed Desktop copies remain opt-in under the host's policy: enable the Desktop half through the Plugins UI if needed. When using a package, Desktop runs an app-root copy; use **Rescan** to synchronize it if needed. No Python backend enablement is needed. No restart is required by the plugin.
+The directory must match the plugin ID. The standalone entry defaults enabled while respecting an explicit disabled choice. Check **Context Overview** in Desktop’s Plugins UI; use **Reload desktop plugins** if necessary. Unified package installation is also supported by Hermes’s plugin installer. For a package-managed copy, use Desktop **Rescan** to synchronize the package source, then enable its Desktop half if needed. No Python backend is included or needs enabling. No restart is required by this plugin.
 
-To roll back, disable the plugin, then remove its standalone folder or uninstall its package using the owning install mechanism. It writes no settings, sessions, files, credentials or plugin storage, so there is no application data to migrate or undo. Do not manually delete a package-managed app-root copy while leaving its source installed.
+To roll back, disable the plugin and remove/uninstall it through its owning installation mechanism. It writes no session data, settings, files or plugin storage. Do not remove a package-managed app-root copy while leaving its source installed.
 
 ## Read-only / privacy boundary
 
-The production file imports only `@hermes/plugin-sdk`, `react`, and `react/jsx-runtime`. It requests **only `session.context_breakdown`** through the host, reads public connection/session state and route descriptors, and navigates its own route. It never reads the filesystem, config, credentials, transcripts or raw prompts; never calls a vendor API, runs inference, sends telemetry, executes tools, or patches global DOM/core behavior. Gateway-returned file paths and labels can still be sensitive metadata: this plugin displays them locally, does not export them, and does not copy them into screenshots/tests/logs.
+Production imports only `@hermes/plugin-sdk`, `react` and `react/jsx-runtime`. The only RPC is `session.context_breakdown`, with only `session_id`. There are no filesystem/config/credential reads, transcript requests, vendor calls, inference, tools, telemetry, navigation or global DOM patches. Paths/labels returned by the gateway may still be sensitive metadata; they remain local and are not exported or used in test fixtures/logs/screenshots.
 
-Refresh is page-scoped React Query: 60-second idle polling, no background-tab polling, bounded retries, explicit refresh, and relevant completion/compression/reclaim events. Busy/disconnected sessions show no old budget. Query keys include connection, profile, focused owner, runtime session, gateway instance and lifecycle/revision identity; pending old-scope results are discarded. Listeners and query observers leave on unmount/disable.
+Queries and event listeners exist only while a popup is open. Explicit refresh, completion/compression/reclaim events and idle polling are scoped to its captured identity. Closing, unmounting or disabling removes observers/listeners; gateway/profile/connection changes invalidate pending snapshots.
 
-## Development and tests
-
-Only dev/test dependencies are installed. The production plugin is plain ESM and has no build step.
+## Development and evidence
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
-PLAYWRIGHT_BROWSERS_PATH=node_modules/.cache/ms-playwright pnpm exec playwright install chromium
+pnpm exec playwright install chromium
 node --check desktop/plugin.js
 pnpm test
 hermes plugins doctor --ci .
 hermes plugins validate . --install-deps
 ```
 
-Linux CI uses `playwright install --with-deps chromium` on a Node runner, not a Docker Hub image. `pnpm test` builds a test-only bundle, registers the **actual production plugin**, mounts its route with real React and React Query, and drives its API/query path in Chromium. The SDK host and native Button are explicitly synthetic seams. Source-import checks, normalization/budget conservation tests, race/error/lifecycle checks, metadata safety checks and four screenshot exports are included. The harness cannot prove native loader integration, theme/component parity, or a live gateway response.
+Dev dependencies only; production is plain ESM with no build step. Browser tests mount the actual registered contribution in **two simultaneous synthetic conversation composers** using real React/React Query and **Radix UI 1.6.7**, the inspected host’s popover primitive/version. Gateway state, focus routing, contribution registry and Button/native wrapper styling remain explicit seams. Tests cover pointer/keyboard ownership, exact owner RPC routing, different budgets, stale-result isolation, lifecycle/retry/privacy behavior and four public screenshots.
 
-**Known tooling limitation:** the inspected `hermes plugins doctor --ci .` fails `No __init__.py` for this Desktop-only package because its doctor path unconditionally attempts Python registration. A dummy Python entry was deliberately not added to disguise this limitation. The same runtime's `hermes plugins validate . --install-deps` recognizes `desktop/plugin.js` as the entry and passes, with a capability-probe-skipped warning. See [verification](docs/verification.md) for exact local evidence and remaining live checks.
+`node scripts/verify.mjs` retains command logs and candidate hashes under ignored `.local/`. The known doctor `No __init__.py` failure is reported as a Desktop-only tooling limitation, not hidden with a dummy Python shim. See [verification](docs/verification.md) for results and limits. No live native renderer, connected gateway, catalog approval or publication is claimed.
 
-## Distinction from existing surfaces
+Core’s global statusbar popover and CLI collector plugins address different surfaces. This package adds an in-conversation inspector by reusing the existing RPC, not by forking core or adding a collector.
 
-Core already has a small statusbar context popover; this plugin adds a persistent, readable full page, 100-cell occupancy visualization and comprehensive metadata table without forking that component. Catalog `context-audit` (ZidoCode, MIT, reviewed at `2aaa96aab2c685798b011a5d6479a4a1fa6a033f`) addresses hook-based CLI context forensics, not a native Desktop context viewer. This package reuses the native RPC rather than copying that collector or any bundled plugin.
-
-MIT · AsoTora. Test theme-token provenance is recorded in `tests/harness-theme.css` and `LICENSE`.
+MIT · AsoTora. Theme-token provenance: `tests/harness-theme.css` and `LICENSE`.

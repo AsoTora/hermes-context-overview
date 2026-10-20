@@ -5,17 +5,15 @@ import plugin, { normalize } from '../desktop/plugin.js'
 import { host } from './sdk.mjs'
 import { example } from './example.mjs'
 
-test('actual entry registers native route, sidebar and working palette command', () => {
+test('actual entry registers only an inline composer action, no global route/nav/palette', () => {
   const values = []
   plugin.register({ register: value => values.push(value), onDispose: fn => fn() })
   assert.equal(plugin.id, 'hermes-context-overview')
   assert.equal(plugin.defaultEnabled, true)
-  assert.equal(values.length, 3)
-  assert.equal(values[0].data.path, '/context-overview')
-  assert.equal(values[1].data.label, 'Context Overview')
-  values[2].data.run()
-  assert.equal(host.lastPath, '/context-overview')
+  assert.equal(values.length, 1)
+  assert.equal(values[0].area, 'composer.actions')
   assert.equal(typeof values[0].render().type, 'function')
+  assert.equal(host.lastPath, undefined)
 })
 test('authoritative occupancy conserves free budget independently of estimates', () => {
   const value = normalize(example)
