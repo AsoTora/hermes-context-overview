@@ -1,10 +1,21 @@
 # Context Overview for Hermes Desktop
 
-**Version 1.2.1:** one new **Context** button with a monochrome context-usage icon in the **bottom status bar**, alongside the existing prompt-cache hit-rate, t/s and RAM indicators. The existing **98% cache indicator is untouched**; it is not the context button. Composer controls have been removed. There is no top-right/titlebar control, sidebar page, command-palette navigation or new collector. Context can be opened and refreshed **during a running turn**, with a latest-snapshot/usage-lag notice.
+**Version 1.2.2:** one new **Context** button with a monochrome context-usage icon in the **bottom status bar**, alongside the existing prompt-cache hit-rate, t/s and RAM indicators. The existing **98% cache indicator is untouched**; it is not the context button. Composer controls have been removed. There is no top-right/titlebar control, sidebar page, command-palette navigation or new collector. Context can be opened and refreshed **during a running turn**, with a latest-snapshot/usage-lag notice.
 
 ![Synthetic browser harness: two conversations and a new bottom status-bar Context popover](docs/screenshots/harness-dark-1280.png)
 
 **Screenshot disclosure:** these are the actual plugin entry rendered in a **synthetic SDK browser harness**, not live Hermes Desktop. All conversations, identifiers, paths and budgets are public demo fixtures. [Narrow light](docs/screenshots/harness-light-390.png), [wide light](docs/screenshots/harness-light-1280.png), [narrow dark](docs/screenshots/harness-dark-390.png).
+
+## All-theme gallery
+
+Release 1.2.2 adapts the popup through native CSS tokens across **12 built-in themes / 24 light and dark palettes**. The approved contact sheets below cover every palette at 1280px and 390px. All images are **SYNTHETIC SDK HARNESS · NOT LIVE DESKTOP**, use public demo data, and do not establish native Desktop rendering. The capture-time approval banner is historical; these captures are approved for this release candidate. See [theme design, provenance and limits](docs/theme-review.md).
+
+| Themes | Wide light | Wide dark | Narrow light | Narrow dark |
+| --- | --- | --- | --- | --- |
+| Nous, GitHub, Catppuccin, Everforest, Solarized, Nous Alt | [Sheet 1](docs/screenshots/themes/sheet-light-1280-1.png) | [Sheet 1](docs/screenshots/themes/sheet-dark-1280-1.png) | [Sheet 1](docs/screenshots/themes/sheet-light-390-1.png) | [Sheet 1](docs/screenshots/themes/sheet-dark-390-1.png) |
+| Classic, Midnight, Ember, Mono, Slate, Cyberpunk | [Sheet 2](docs/screenshots/themes/sheet-light-1280-2.png) | [Sheet 2](docs/screenshots/themes/sheet-dark-1280-2.png) | [Sheet 2](docs/screenshots/themes/sheet-light-390-2.png) | [Sheet 2](docs/screenshots/themes/sheet-dark-390-2.png) |
+
+Midnight, Ember, Mono, Slate and Cyberpunk use the native synthesized light palette, not invented overrides. The four older screenshots above remain historical demonstrations; the contact sheets show the approved all-theme styling.
 
 ## Use
 
@@ -72,9 +83,9 @@ hermes plugins doctor --ci .
 hermes plugins validate . --install-deps
 ```
 
-Dev dependencies only; production is plain ESM with no build step. Browser tests mount the actual registered contribution in **one synthetic bottom status bar and two simultaneous conversations** using real React/React Query and **Radix UI 1.6.7**, the inspected host’s popover primitive/version. Gateway state, focus routing, contribution registry and Button/native wrapper styling remain explicit seams. Tests cover pointer/keyboard ownership, exact owner RPC routing, different budgets, stale-result isolation, lifecycle/retry/privacy behavior and four public screenshots.
+Dev dependencies only; production is plain ESM with no build step. Browser tests mount the actual registered contribution in **one synthetic bottom status bar and two simultaneous conversations** using real React/React Query and **Radix UI 1.6.7**, the inspected host’s popover primitive/version. Gateway state, focus routing, contribution registry and Button/native wrapper styling remain explicit seams. Tests cover pointer/keyboard ownership, exact owner RPC routing, different budgets, stale-result isolation, lifecycle/retry/privacy behavior, all 24 native palettes and approved wide/narrow synthetic theme contact sheets.
 
-`pnpm gate` checks syntax, version/changelog consistency, all entry/browser tests, release negative tests, deterministic packaging and archive/content/checksum verification without Hermes installed. Node 22/24, pnpm 10.33.0 and Python 3.10+ stdlib are supported tooling targets. `node scripts/verify.mjs` runs that gate plus optional native tooling and retains full command logs and candidate hashes under ignored `.local/evidence/`, excluding `dist/` and evidence itself. The known doctor `No __init__.py` failure is reported as a Desktop-only tooling limitation, not hidden with a dummy Python shim. See [verification](docs/verification.md) for results and limits. No live native renderer, connected gateway, catalog approval or publication is claimed.
+`pnpm gate` checks syntax, version/changelog consistency, all entry/browser tests, release negative tests, deterministic packaging and archive/content/checksum verification without Hermes installed. Node 22/24, pnpm 10.33.0 and Python 3.10+ stdlib are supported tooling targets. `node scripts/verify.mjs` runs that gate plus optional native tooling and retains ignored local command logs and candidate hashes, excluding build outputs and evidence itself. The known doctor `No __init__.py` failure is reported as a Desktop-only tooling limitation, not hidden with a dummy Python shim. See [verification](docs/verification.md) for results and limits. No live native renderer, connected gateway, catalog approval or publication is claimed.
 
 This package adds a separate bottom status-bar inspector by reusing the existing RPC, not by changing native cache/performance indicators, forking core or adding a collector.
 

@@ -12,7 +12,7 @@ const text = (value, fallback = '') => typeof value === 'string' ? value.replace
 const fmt = value => value === null ? 'Unknown' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value)
 const percentage = (value, max) => max > 0 && value !== null ? `${(value / max * 100).toFixed(1)}%` : '—'
 const categoryTokens = { system_prompt: 'system', tool_definitions: 'tools', rules: 'rules', skills: 'skills', mcp: 'mcp', subagent_definitions: 'subagents', memory: 'memory', conversation: 'conversation' }
-const color = id => categoryTokens[id] ? `var(--context-usage-${categoryTokens[id]})` : 'var(--ui-text-secondary)'
+const color = id => categoryTokens[id] ? `var(--co-${categoryTokens[id]})` : 'var(--co-muted)'
 
 export function normalize(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('missing-data')
@@ -176,9 +176,52 @@ export function ContextControl() {
   ] })
 }
 
+// Plugin-local roles follow native tokens, including live theme/accent changes.
+// Small secondary text uses near-primary ink: some native skins deliberately
+// have low-contrast secondary text. Hierarchy comes from size and spacing.
 const styles = `
-.hermes-context-overview{box-sizing:border-box;width:min(380px,calc(100vw - 24px));max-height:min(620px,var(--radix-popover-content-available-height,75vh));overflow:auto;overscroll-behavior:contain;padding:14px;color:var(--ui-text-primary);background:var(--ui-bg-elevated);border:1px solid var(--ui-stroke-secondary);border-radius:10px;font-size:12px;line-height:1.5}
-.hermes-context-overview *{box-sizing:border-box}.hermes-context-overview h2{font-size:14px;margin:0}.hermes-context-overview h3{font-size:12px;margin:16px 0 6px}.hermes-context-overview p{margin:8px 0}.hermes-context-overview code{display:block;overflow-wrap:anywhere;white-space:normal;font-size:11px}.hermes-context-overview .co-header{display:flex;gap:12px;align-items:center;justify-content:space-between}.hermes-context-overview .co-muted{color:var(--ui-text-secondary);font-size:11px}.hermes-context-overview .co-summary{margin-top:14px;font-variant-numeric:tabular-nums}.hermes-context-overview .co-summary strong{font-size:16px}.hermes-context-overview .co-grid{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:3px;margin:12px 0}.hermes-context-overview .co-cell{height:9px;border:1px solid var(--ui-stroke-secondary);border-radius:2px;background:var(--ui-editor-surface-background)}.hermes-context-overview .co-occupied{background:var(--ui-accent);border-color:var(--ui-accent)}.hermes-context-overview .co-unknown{background:repeating-linear-gradient(135deg,transparent,transparent 3px,var(--ui-stroke-secondary) 3px,var(--ui-stroke-secondary) 5px)}.hermes-context-overview .co-categories{list-style:none;margin:0;padding:0}.hermes-context-overview .co-categories li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--ui-stroke-secondary);padding:5px 0;font-variant-numeric:tabular-nums}.hermes-context-overview .co-category{display:flex;align-items:center;gap:6px;min-width:0;overflow-wrap:anywhere}.hermes-context-overview .co-swatch{width:7px;height:7px;border-radius:2px;flex:none}.hermes-context-overview details{border-top:1px solid var(--ui-stroke-secondary);padding-top:8px;margin-top:10px}.hermes-context-overview summary{cursor:pointer;color:var(--ui-text-secondary)}.hermes-context-overview .co-files{padding-left:16px}.hermes-context-overview :focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}
+.hermes-context-overview{
+ --co-surface:var(--ui-bg-elevated);
+ --co-muted:var(--ui-text-primary);
+ --co-line:color-mix(in srgb,var(--ui-base) 14%,var(--co-surface));
+ --co-cell-edge:color-mix(in srgb,var(--ui-base) 50%,var(--co-surface));
+ --co-free:color-mix(in srgb,var(--ui-base) 4%,var(--co-surface));
+ --co-occupied:color-mix(in srgb,var(--ui-accent) 72%,var(--ui-base));
+ --co-system:color-mix(in srgb,var(--context-usage-system) 78%,var(--ui-base));
+ --co-tools:color-mix(in srgb,var(--context-usage-tools) 78%,var(--ui-base));
+ --co-rules:color-mix(in srgb,var(--context-usage-rules) 78%,var(--ui-base));
+ --co-skills:color-mix(in srgb,var(--context-usage-skills) 78%,var(--ui-base));
+ --co-mcp:color-mix(in srgb,var(--context-usage-mcp) 78%,var(--ui-base));
+ --co-subagents:color-mix(in srgb,var(--context-usage-subagents) 78%,var(--ui-base));
+ --co-memory:color-mix(in srgb,var(--context-usage-memory) 78%,var(--ui-base));
+ --co-conversation:color-mix(in srgb,var(--context-usage-conversation) 78%,var(--ui-base));
+ box-sizing:border-box;width:min(380px,calc(100vw - 24px));max-height:min(660px,var(--radix-popover-content-available-height,75vh));overflow:auto;overscroll-behavior:contain;padding:14px;color:var(--ui-text-primary);background:var(--co-surface);border:1px solid var(--co-line);border-radius:12px;box-shadow:0 8px 28px color-mix(in srgb,var(--ui-base) 12%,transparent);font-size:12px;line-height:1.5
+}
+.hermes-context-overview *{box-sizing:border-box}
+.hermes-context-overview h2{font-size:14px;font-weight:600;letter-spacing:-.015em;margin:0}
+.hermes-context-overview h3{font-size:11px;font-weight:600;margin:16px 0 6px}
+.hermes-context-overview p{margin:7px 0}
+.hermes-context-overview code{display:block;overflow-wrap:anywhere;white-space:normal;font-size:11px}
+.hermes-context-overview .co-header{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.hermes-context-overview .co-header button{height:auto;padding:5px 7px;font-size:11px;color:var(--co-muted);border:1px solid var(--co-line);border-radius:6px;background:transparent;white-space:nowrap}
+.hermes-context-overview .co-header button:hover{background:var(--co-free)}
+.hermes-context-overview .co-muted{color:var(--co-muted);font-size:11px}
+.hermes-context-overview .co-summary{margin-top:16px;font-variant-numeric:tabular-nums}
+.hermes-context-overview .co-summary strong{font-size:17px;font-weight:600;letter-spacing:-.025em}
+.hermes-context-overview .co-grid{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:3px;margin:12px 0}
+.hermes-context-overview .co-cell{height:9px;border:1px solid var(--co-cell-edge);border-radius:2px;background:var(--co-free)}
+.hermes-context-overview .co-occupied{background:var(--co-occupied);border-color:var(--co-occupied)}
+.hermes-context-overview .co-unknown{background:repeating-linear-gradient(135deg,var(--co-free),var(--co-free) 3px,var(--co-cell-edge) 3px,var(--co-cell-edge) 5px)}
+.hermes-context-overview .co-categories{list-style:none;margin:0;padding:0}
+.hermes-context-overview .co-categories li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--co-line);padding:5px 0;font-variant-numeric:tabular-nums}
+.hermes-context-overview .co-categories li:last-child{border-bottom:0}
+.hermes-context-overview .co-categories li>span:last-child{white-space:nowrap;flex-shrink:0;font-size:11px}
+.hermes-context-overview .co-category{display:flex;align-items:center;gap:8px;min-width:0;overflow-wrap:anywhere}
+.hermes-context-overview .co-swatch{width:8px;height:8px;border-radius:2px;flex:none;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ui-base) 16%,transparent)}
+.hermes-context-overview details{border-top:1px solid var(--co-line);padding-top:8px;margin-top:10px}
+.hermes-context-overview summary{cursor:pointer;color:var(--co-muted);font-size:11px}
+.hermes-context-overview .co-files{padding-left:16px}
+.hermes-context-overview :focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}
 `
 
 export default {

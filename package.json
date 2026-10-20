@@ -1,6 +1,6 @@
 {
   "name": "hermes-context-overview",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "type": "module",
   "description": "Metadata-only native Hermes Desktop context budget viewer",
@@ -15,7 +15,9 @@
     "release:pack": "python3 scripts/release.py pack",
     "release:verify": "python3 scripts/release.py verify",
     "gate": "pnpm check && pnpm test && pnpm test:release && pnpm release:pack && pnpm release:verify",
-    "screenshots": "node --import ./tests/setup.mjs --test tests/browser.test.mjs"
+    "screenshots": "node --import ./tests/setup.mjs --test tests/browser.test.mjs",
+    "screenshots:themes": "node --import ./tests/setup.mjs --test tests/themes.test.mjs",
+    "fixtures:themes": "node scripts/theme-fixtures.mjs"
   },
   "devDependencies": {
     "@tanstack/react-query": "5.101.2",

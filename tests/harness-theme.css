@@ -1,29 +1,8 @@
-/* Harness-only adapter of Hermes theme tokens. Not production CSS.
- * Values/formulas from styles.css and Nous theme-presets.ts at
- * d923a5eb487a17c0a68801bba9ef0f56c81040a8 (MIT, Nous Research).
- * SDK Button is a declared seam, not a claim of native component rendering. */
-:root {
- color-scheme:light;
- --theme-foreground:#1f2328;--theme-midground:#0053fd;--theme-primary:#0053fd;
- --theme-card-seed:#f6f8fa;--theme-elevated-seed:#ffffff;--theme-neutral-card:#fcfcfc;
- --theme-mix-card:22%;--theme-mix-elevated:28%;--theme-fill-secondary-accent-mix:11%;--theme-stroke-secondary-accent-mix:16%;
- --ui-base:var(--theme-foreground);--ui-accent:var(--theme-midground);
- --ui-text-primary:color-mix(in srgb,var(--ui-base) 94%,transparent);
- --ui-text-secondary:color-mix(in srgb,var(--ui-base) 74%,transparent);
- --ui-editor-surface-background:var(--ui-bg-editor);
- --ui-bg-editor:color-mix(in srgb,var(--theme-card-seed) var(--theme-mix-card),var(--theme-neutral-card));
- --ui-bg-elevated:color-mix(in srgb,var(--theme-elevated-seed) var(--theme-mix-elevated),var(--theme-neutral-card));
- --ui-bg-card:color-mix(in srgb,var(--ui-accent) 4%,color-mix(in srgb,var(--ui-base) 4%,transparent));
- --ui-bg-secondary:color-mix(in srgb,var(--ui-accent) var(--theme-fill-secondary-accent-mix),color-mix(in srgb,var(--ui-base) 7%,transparent));
- --ui-stroke-secondary:color-mix(in srgb,var(--ui-accent) var(--theme-stroke-secondary-accent-mix),color-mix(in srgb,var(--ui-base) 7%,transparent));
- --ui-red:#cf2d56;--ui-orange:#db704b;--ui-yellow:#c08532;--ui-green:#1f8a65;--ui-cyan:#4c7f8c;--ui-blue:#0053fd;--ui-purple:#9e94d5;
- --context-usage-system:color-mix(in srgb,var(--ui-base) 55%,transparent);--context-usage-tools:var(--ui-purple);--context-usage-rules:var(--ui-green);--context-usage-skills:var(--ui-yellow);--context-usage-mcp:color-mix(in srgb,var(--ui-red) 72%,var(--ui-purple));--context-usage-subagents:color-mix(in srgb,var(--ui-blue) 70%,var(--ui-cyan));--context-usage-memory:color-mix(in srgb,var(--ui-orange) 80%,var(--ui-yellow));--context-usage-conversation:var(--ui-cyan);
-}
-:root.dark {color-scheme:dark;--theme-foreground:#e6edf3;--theme-midground:#4a84fe;--theme-primary:#4a84fe;--theme-card-seed:#010409;--theme-elevated-seed:#161b22;--theme-neutral-card:#161618;--theme-mix-card:38%;--theme-mix-elevated:46%;--ui-red:#e75e78;--ui-green:#55a583;--ui-cyan:#6f9ba6}
+/* Synthetic shell/SDK only. Native theme declarations are a pinned fixture. */
+@import './fixtures/native-themes/tokens.css';
 .demo-shell{height:100%;display:flex;flex-direction:column}.demo-shell .demo-conversations{flex:1;min-height:0;height:auto}.demo-statusbar{height:26px;flex:none;border-top:1px solid var(--ui-stroke-secondary);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--ui-text-secondary);padding:0 8px;background:var(--ui-bg-elevated)}.demo-statusbar-right{display:flex;align-items:center;gap:8px;height:100%}.demo-statusbar button{font:inherit;color:inherit;background:transparent;border:0;cursor:pointer}.demo-statusbar button:hover{background:var(--ui-bg-secondary)}.demo-statusbar button:focus-visible{outline:2px solid var(--ui-accent);outline-offset:-2px}
-html,body,#app{height:100%;margin:0}body{font-family:system-ui,sans-serif;background:var(--ui-bg-editor);color:var(--ui-text-primary)}
-body{display:flex;flex-direction:column}#app{flex:1;min-height:0;height:auto}.synthetic-banner{flex:none;padding:9px 20px;font-size:11px;background:var(--ui-bg-elevated);color:var(--ui-text-secondary);border-bottom:1px solid var(--ui-stroke-secondary)}
+html,body,#app{height:100%;margin:0}body{font-family:var(--dt-font-sans,system-ui),sans-serif;background:var(--ui-bg-editor);color:var(--ui-text-primary)}
+body{display:flex;flex-direction:column}#app{flex:1;min-height:0;height:auto}.synthetic-banner{flex:none;padding:9px 20px;font-size:11px;background:var(--ui-bg-elevated);color:var(--ui-text-primary);border-bottom:1px solid var(--ui-stroke-secondary)}
 .synthetic-sdk-button{font:inherit;font-size:12px;white-space:nowrap;padding:8px 12px;border-radius:7px;border:1px solid var(--ui-stroke-secondary);background:var(--ui-bg-elevated);color:var(--ui-text-primary);cursor:pointer}.synthetic-sdk-button:disabled{opacity:.55;cursor:default}
-
 .demo-conversations{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:100%;padding:24px;box-sizing:border-box}.demo-conversation{min-width:0;position:relative;border:1px solid var(--ui-stroke-secondary);border-radius:12px;padding:24px;display:flex;flex-direction:column}.demo-conversation h1{font-size:17px}.demo-message{max-width:85%;padding:14px;border-radius:12px;background:var(--ui-bg-secondary);font-size:13px;line-height:1.6}.demo-composer{margin-top:auto;border:1px solid var(--ui-stroke-secondary);border-radius:16px;padding:12px;background:var(--ui-bg-elevated)}.demo-composer textarea{width:100%;box-sizing:border-box;resize:none;border:0;background:transparent;color:var(--ui-text-primary);font:inherit;min-height:48px}.demo-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;font-size:12px;color:var(--ui-text-secondary)}.demo-actions button{font:inherit;color:var(--ui-text-primary);border:1px solid var(--ui-stroke-secondary);border-radius:8px;padding:7px 10px;background:var(--ui-bg-elevated)}
 @media(max-width:600px){.demo-conversations{grid-template-columns:1fr;grid-template-rows:1fr 1fr;padding:8px;gap:8px}.demo-conversation{padding:14px}.demo-message{margin:4px 0 16px}.demo-conversation h1{margin:2px 0 8px}.demo-composer textarea{min-height:32px}}

@@ -1,0 +1,35 @@
+{
+  "revision": "d923a5eb487a17c0a68801bba9ef0f56c81040a8",
+  "license": "MIT — Nous Research; see LICENSE",
+  "sources": [
+    {
+      "path": "apps/desktop/src/themes/presets.ts",
+      "sha256": "be92a1408f3aa0e5c6e8fe5958169f03a910524a4cdfd77f83579794467a908d"
+    },
+    {
+      "path": "apps/shared/src/theme-presets.ts",
+      "sha256": "ada88929c0500ce1f0a5b9d097c85c0ea6959c65107146bee8017445bd0e937b"
+    },
+    {
+      "path": "apps/desktop/src/themes/context.tsx",
+      "sha256": "c4c9feea2b7791ec971890df3d7bf22436f9fa29ef92df3142cae553f66afa8a"
+    },
+    {
+      "path": "apps/desktop/src/themes/skin.ts",
+      "sha256": "06a7d427bc8ede26a3fe5b216406612e45313d85face296af5632a4d71a0015d"
+    },
+    {
+      "path": "apps/desktop/src/themes/color.ts",
+      "sha256": "e27bd48928bdb34ebde3cb93e528b4c677d761eee0b8819efc82714e65ebc4b5"
+    },
+    {
+      "path": "apps/shared/src/color.ts",
+      "sha256": "608965b40f22d98eede54d49319a5423acc12565f7d769a681ec725f33073cba"
+    },
+    {
+      "path": "apps/desktop/src/styles.css",
+      "sha256": "4dbc9cb59f06fd6be4e5ae6ae4e8b861e8ceb26e2165cbc8bbdab7e2fe7dccaf"
+    }
+  ],
+  "seams": "Native palette selection, light synthesis, applyTheme and CSS tokens. No Desktop stores, IPC, custom CSS, accent overrides, remote fonts or native window materials. SDK components remain synthetic."
+}

@@ -8,6 +8,8 @@ import plugin from '../desktop/plugin.js'
 import { harness } from './sdk.mjs'
 import { example } from './example.mjs'
 import './harness-theme.css'
+import { applyNativeTheme, palettes } from './fixtures/native-themes/runtime.mjs'
+applyNativeTheme('nous', 'light')
 harness.setResponse(example)
 const contributions = [], disposers = []
 plugin.register({ register: value => { contributions.push(value); return () => {} }, onDispose: fn => disposers.push(fn) })
@@ -36,7 +38,7 @@ function mount() {
   ] }, key)) }), jsxs('footer', { 'aria-label': 'Synthetic bottom status bar', className: 'demo-statusbar', children: [jsx('span', { children: 'Synthetic status bar' }), jsxs('div', { className: 'demo-statusbar-right', children: [jsx('button', { type: 'button', 'aria-label': 'prompt-cache hit-rate 98%', children: '98%' }), jsx('span', { children: '42 t/s' }), jsx('span', { children: '1.2 GB RAM' }), action.render()] })] })] }) }))
 }
 window.harness = {
-  ...harness, example, contributions: contributions.map(({ render, ...value }) => value), scopes,
+  ...harness, applyNativeTheme, palettes, example, contributions: contributions.map(({ render, ...value }) => value), scopes,
   mount, unmount() { root.render(null) },
   dispose() {
     root.render(null); for (const fn of disposers) fn(); client.clear()

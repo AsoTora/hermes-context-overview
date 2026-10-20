@@ -15,7 +15,15 @@ FILES = tuple(sorted(('plugin.yaml', 'desktop/plugin.js', 'LICENSE', 'README.md'
                       'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'docs/releases.md',
                       'docs/verification.md', 'docs/screenshots/harness-dark-1280.png',
                       'docs/screenshots/harness-dark-390.png', 'docs/screenshots/harness-light-1280.png',
-                      'docs/screenshots/harness-light-390.png')))
+                      'docs/screenshots/harness-light-390.png', 'docs/theme-review.md',
+                      'docs/screenshots/themes/sheet-light-1280-1.png',
+                      'docs/screenshots/themes/sheet-light-1280-2.png',
+                      'docs/screenshots/themes/sheet-dark-1280-1.png',
+                      'docs/screenshots/themes/sheet-dark-1280-2.png',
+                      'docs/screenshots/themes/sheet-light-390-1.png',
+                      'docs/screenshots/themes/sheet-light-390-2.png',
+                      'docs/screenshots/themes/sheet-dark-390-1.png',
+                      'docs/screenshots/themes/sheet-dark-390-2.png')))
 
 
 def contract(root, tag=None):

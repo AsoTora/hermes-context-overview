@@ -11,7 +11,7 @@ const root = resolve(import.meta.dirname, '..')
 const errors = []
 before(async () => {
   await mkdir(resolve(root, '.local/browser'), { recursive: true })
-  await mkdir(resolve(root, 'docs/screenshots'), { recursive: true })
+  await mkdir(resolve(root, '.local/browser/screenshots'), { recursive: true })
   await build({ entryPoints: [resolve(root, 'tests/harness.mjs')], bundle: true, format: 'esm', outfile: resolve(root, '.local/browser/harness.js'), alias: { '@hermes/plugin-sdk': resolve(root, 'tests/sdk.mjs') }, logLevel: 'silent' })
   server = createServer(async (request, response) => {
     if (request.url === '/harness.js' || request.url === '/harness.css') {
@@ -365,7 +365,7 @@ test('synthetic bottom status-bar screenshots: light/dark, narrow/wide, containe
   await fresh()
   const samples = []
   for (const theme of ['light', 'dark']) for (const width of [1280, 390]) {
-    await page.evaluate(theme => document.documentElement.classList.toggle('dark', theme === 'dark'), theme)
+    await page.evaluate(theme => window.harness.applyNativeTheme('nous', theme), theme)
     await page.setViewportSize({ width, height: 900 })
     await page.keyboard.press('Escape'); await closed()
     await focusConversation(width === 390 ? 1 : 0)
@@ -395,7 +395,7 @@ test('synthetic bottom status-bar screenshots: light/dark, narrow/wide, containe
     })
     assert.ok(contrast >= 4.5)
     samples.push({ theme, width, secondaryTextContrast: contrast })
-    await page.screenshot({ path: resolve(root, `docs/screenshots/harness-${theme}-${width}.png`), fullPage: true })
+    await page.screenshot({ path: resolve(root, `.local/browser/screenshots/harness-${theme}-${width}.png`), fullPage: true })
     await page.keyboard.press('Escape'); await closed()
     assert.equal(await trigger().evaluate(node => document.activeElement === node), true)
   }

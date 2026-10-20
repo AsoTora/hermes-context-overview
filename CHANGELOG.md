@@ -2,6 +2,16 @@
 
 Versions describe source milestones; the 1.0.0–1.2.0 entries were not previously tagged GitHub releases. Dates are 2026-10-20, when these changes landed.
 
+## [1.2.2] - 2026-10-20
+
+### Fixed
+- Adapted the Context popup to all 12 built-in themes and their 24 native light/dark palettes using native CSS tokens, with readable secondary text, visible free-cell outlines, semantic allocation swatches and monospace-friendly height.
+- Preserved existing context requests, counts, ownership, privacy, focus handling and refresh behavior; no production dependencies or backend changes.
+
+### Added
+- Pinned native-theme fixtures and Chromium coverage for palette switching, text contrast, cell/swatch visibility and wide/narrow containment.
+- Approved synthetic theme gallery with eight explicitly allowlisted contact sheets covering every built-in palette at wide and narrow widths. Screenshots are not live Desktop verification.
+
 ## [1.2.1] - 2026-10-20
 
 ### Added

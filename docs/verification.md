@@ -1,18 +1,17 @@
-# Verification boundary — 1.2.1
+# Verification boundary — 1.2.2
 
-## Results
+## Verification scope
 
-The production ESM contribution is covered by **33 tests: 25 Chromium browser-harness tests plus 8 entry/normalization/privacy tests**, and **10 Python stdlib release tests**. These use real React, React Query and Radix UI **1.6.7**, matching the inspected Desktop dependency. SDK atoms/async routing/RPC/events, contribution registry, native Button/wrapper styling and host focus routing are explicit synthetic seams. This is source/browser verification, not a live Desktop installation. Final exit codes and candidate hashes are retained in the local receipt rather than inferred from this document.
+The production ESM contribution is covered by **34 JS tests: 25 Chromium behavior tests, 8 entry/normalization/privacy tests and one all-theme Chromium test**, plus **11 Python stdlib release tests**. They use real React, React Query and Radix UI **1.6.7**, matching the inspected Desktop dependency. SDK atoms/async routing/RPC/events, contribution registry, native Button/wrapper styling and host focus routing remain explicit synthetic seams. This is source/browser verification, not a live Desktop installation.
 
-| Command | Result | Retained evidence |
-| --- | --- | --- |
-| `pnpm gate` | canonical syntax/contract, 33 JS + 10 release tests, packaging and verification | `.local/evidence/final-gate.log` |
-| `hermes plugins doctor --ci .` | **exit 1**, known Desktop-only tooling limitation | `.local/evidence/final-doctor.log` |
-| `hermes plugins validate . --install-deps` | exit 0; SDK surface valid; security scan safe; Python capability probe skipped | `.local/evidence/final-validate.log` |
+`pnpm gate` checks syntax, version/changelog consistency, JS and release tests, deterministic packaging and exact artifact content/checksums. The theme test covers all 12 built-ins / 24 native palettes at wide and narrow widths, computed text contrast, visible cells/swatches, overflow, default footer clipping and switching palettes without extra context requests. Release tests independently extract the archive and verify the explicit eight-sheet gallery, reject missing sheets and exclude unlisted images. See [approved theme evidence and limits](theme-review.md).
 
-`node scripts/verify.mjs` preserves command output and writes `.local/evidence/evidence.json` with command exit codes, log SHA-256 values and a sorted candidate file/size/SHA-256 inventory, excluding `dist/`, caches and evidence itself. The script exits 1 while doctor fails; it never turns that failure into a passing check. Local validation reuses the original checkout’s existing Playwright browser cache through `PLAYWRIGHT_BROWSERS_PATH`; dev dependencies are installed only in this isolated worktree using frozen offline pnpm. No Hermes dependencies or browsers are installed into the runtime checkout. Hosted CI and tag publication remain separate from local receipts.
+Native tooling is separate from that portable gate:
 
-The doctor tries Python registration and fails `No __init__.py` for this Desktop-only package. The native-aware validator accepts `desktop/plugin.js`, skips Python capability probing, reports portable/no Python and passes. No dummy Python shim was added. Doctor coverage is unavailable, not a native renderer failure or a passing gate.
+- `hermes plugins validate . --install-deps` validates the package/SDK surface and security scan, skipping Python capability probing for this Desktop-only package. It does not load a native renderer.
+- `hermes plugins doctor --ci .` has a known `No __init__.py` limitation: it tries Python registration for this Desktop-only package. Its failure must remain reported separately, not hidden with a dummy Python shim or represented as a passing gate.
+
+`node scripts/verify.mjs` preserves ignored local command output and a sorted candidate hash inventory. It exits nonzero while doctor fails. Exact execution receipts belong in local evidence, not release assets. Hosted CI, publication, installation and native Desktop verification are separate checks; this document does not claim them.
 
 ## Public status-bar surface and focused ownership
 
@@ -60,7 +59,7 @@ The trigger includes actual inline SVG markup (two paths, 12×12, `currentColor`
 
 `docs/screenshots/harness-{light,dark}-{1280,390}.png` show actual plugin output anchored to a synthetic bottom status-bar button, not either composer. They are visibly marked **SYNTHETIC SDK HARNESS · PUBLIC DEMO DATA · NOT LIVE DESKTOP**. The narrow/wide light/dark images retain the normal 900px viewport rather than enlarging a full-page dashboard. Popovers are viewport-bounded and internally scrollable when disclosures expand; browser assertions check panel bounds and horizontal containment.
 
-Theme values/formulas come from the inspected runtime and are attributed in `tests/harness-theme.css` / `LICENSE`; native Button styling remains a disclosed approximation. `.local/browser-visual-checks.json` records sampled secondary-text contrast above 4.5:1 in both themes. This is not exhaustive WCAG or native-theme parity proof. `.local/browser-console.json` is empty for the passing run. Wide dark and narrow light screenshots were visually inspected for bottom placement, the separate cache indicator, readable hierarchy and clipping.
+Theme values/formulas come from the inspected runtime and are attributed in `tests/harness-theme.css` / `LICENSE`; native Button styling remains a disclosed approximation. The historical browser checks sampled secondary-text contrast above 4.5:1 in both themes. Current all-theme coverage and approved contact sheets are described in [theme review](theme-review.md). Neither is exhaustive WCAG certification or live native-renderer proof.
 
 ## Not established / not performed
 
