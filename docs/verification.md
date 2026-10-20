@@ -1,4 +1,4 @@
-# Verification boundary — 1.2.2
+# Verification boundary — 1.2.3
 
 ## Verification scope
 
@@ -57,7 +57,7 @@ The existing cross-connection regression uses the public gateway event's `connec
 
 The trigger includes actual inline SVG markup (two paths, 12×12, `currentColor`, `aria-hidden`, nonfocusable). Browser assertions verify it while retaining exact accessible name Context, native trigger keyboard behavior and unchanged separate cache markup. Narrow screenshots include a running-turn lag notice alongside the breakdown.
 
-`docs/screenshots/harness-{light,dark}-{1280,390}.png` show actual plugin output anchored to a synthetic bottom status-bar button, not either composer. They are visibly marked **SYNTHETIC SDK HARNESS · PUBLIC DEMO DATA · NOT LIVE DESKTOP**. The narrow/wide light/dark images retain the normal 900px viewport rather than enlarging a full-page dashboard. Popovers are viewport-bounded and internally scrollable when disclosures expand; browser assertions check panel bounds and horizontal containment.
+Browser-test captures (`.local/browser/screenshots/harness-{light,dark}-{1280,390}.png`) show actual plugin output anchored to the harness bottom status-bar button, not either composer, at the normal 900px viewport. The public README images are generated separately by `pnpm screenshots:docs` with demo data. Popovers are viewport-bounded and internally scrollable when disclosures expand; browser assertions check panel bounds and horizontal containment.
 
 Theme values/formulas come from the inspected runtime and are attributed in `tests/harness-theme.css` / `LICENSE`; native Button styling remains a disclosed approximation. The historical browser checks sampled secondary-text contrast above 4.5:1 in both themes. Current all-theme coverage and approved contact sheets are described in [theme review](theme-review.md). Neither is exhaustive WCAG certification or live native-renderer proof.
 

@@ -2,6 +2,13 @@
 
 Versions describe source milestones; the 1.0.0–1.2.0 entries were not previously tagged GitHub releases. Dates are 2026-10-20, when these changes landed.
 
+## [1.2.3] - 2026-10-20
+
+### Changed
+- Replaced the README and catalog screenshots with clean overview shots and one gallery per mode covering all 12 built-in themes; removed the review contact sheets and older harness captures.
+- Added `pnpm screenshots:docs` to regenerate the public screenshots from the real plugin entry with demo data.
+- No runtime changes: `desktop/plugin.js` is identical to 1.2.2.
+
 ## [1.2.2] - 2026-10-20
 
 ### Fixed

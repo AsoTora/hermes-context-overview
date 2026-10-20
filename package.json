@@ -1,6 +1,6 @@
 {
   "name": "hermes-context-overview",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "private": true,
   "type": "module",
   "description": "Metadata-only native Hermes Desktop context budget viewer",
@@ -8,7 +8,7 @@
   "author": "AsoTora",
   "scripts": {
     "test": "node --import ./tests/setup.mjs --test tests/*.test.mjs",
-    "check": "node --check desktop/plugin.js && node --check scripts/verify.mjs && python3 scripts/release.py check",
+    "check": "node --check desktop/plugin.js && node --check scripts/verify.mjs && node --check scripts/screenshots.mjs && bash -n scripts/bump-catalog.sh && python3 scripts/release.py check",
     "test:release": "python3 -m unittest discover -s tests -p 'test_release.py' -v",
     "release:check": "python3 scripts/release.py check",
     "release:notes": "python3 scripts/release.py notes",
@@ -16,6 +16,7 @@
     "release:verify": "python3 scripts/release.py verify",
     "gate": "pnpm check && pnpm test && pnpm test:release && pnpm release:pack && pnpm release:verify",
     "screenshots": "node --import ./tests/setup.mjs --test tests/browser.test.mjs",
+    "screenshots:docs": "node scripts/screenshots.mjs",
     "screenshots:themes": "node --import ./tests/setup.mjs --test tests/themes.test.mjs",
     "fixtures:themes": "node scripts/theme-fixtures.mjs"
   },

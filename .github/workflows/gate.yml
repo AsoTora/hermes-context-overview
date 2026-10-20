@@ -41,10 +41,7 @@ jobs:
         with:
           name: synthetic-context-evidence-node-${{ matrix.node }}
           path: |
-            docs/screenshots/harness-dark-1280.png
-            docs/screenshots/harness-dark-390.png
-            docs/screenshots/harness-light-1280.png
-            docs/screenshots/harness-light-390.png
+            .local/browser/screenshots/*.png
             .local/browser-console.json
             .local/browser-visual-checks.json
           retention-days: 14

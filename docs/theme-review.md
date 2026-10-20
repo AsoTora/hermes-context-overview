@@ -1,6 +1,6 @@
-# Approved theme release candidate — 1.2.2
+# Theme support — 1.2.3
 
-The all-theme presentation candidate and its 24-palette screenshots are approved for release 1.2.2. This document describes the approved source candidate, not a completed publication or live Desktop verification. No installation or live Desktop changes were made.
+The popup follows all 12 built-in themes and their 24 light/dark palettes through native CSS tokens. This document covers the design, the review evidence and its limits; it is not live Desktop verification.
 
 ## Design
 
@@ -24,9 +24,9 @@ The generated fixture runs without the installed Hermes checkout. Only fixture r
 pnpm fixtures:themes /path/to/hermes-agent
 ```
 
-## Approved synthetic gallery
+## Public screenshots
 
-The [README theme gallery](../README.md#all-theme-gallery) links all eight public contact sheets under `docs/screenshots/themes/`. They preserve the approved review captures byte-for-byte. Their “Approval required before publication” banner records the capture-time review state; screenshot approval has since been granted for this release candidate. Historical screenshots remain unchanged.
+`pnpm screenshots:docs` writes the four public images under `docs/screenshots/`: `overview-{dark,light}.png` (the popover above the status bar) and `themes-{dark,light}.png` (one popover per built-in theme). They render the real plugin entry with demo data and contain no review labels.
 
 ## Reproducing review evidence
 
@@ -40,10 +40,10 @@ The [README theme gallery](../README.md#all-theme-gallery) links all eight publi
 
 The browser test measures computed colors after Chromium resolves native CSS and alpha composition. It requires normal popup text contrast of at least 4.5:1, distinct visible swatches, visible free-cell boundaries, unchanged cell counts, no horizontal overflow, and no default footer clipping. It switches every palette while the same popup stays mounted and confirms that theme changes make no extra context request. Existing behavior tests remain part of `pnpm gate`.
 
-`pnpm gate` includes the theme test and creates local package archives as an existing gate step. These archives are not publication or installation. Generated reports and captures stay ignored and are not release assets; only the eight deliberately selected public contact sheets are packaged. The older browser test writes refreshed images to ignored local evidence rather than overwriting historical screenshots.
+`pnpm gate` includes the theme test and creates local package archives as an existing gate step. These archives are not publication or installation. Generated reports and captures stay ignored and are not release assets; only the four public screenshots are packaged. The browser tests write their captures to ignored local evidence.
 
 ## Limits
 
-All data and screenshots are synthetic and explicitly labeled **NOT LIVE DESKTOP**. The palette calculations and native CSS variables are exact pinned code. React, React Query, and Radix are real, but the Desktop host, routing, and SDK Button are test adapters.
+All data is demo data and the screenshots come from the browser harness, not live Desktop. The palette calculations and native CSS variables are exact pinned code. React, React Query, and Radix are real, but the Desktop host, routing, and SDK Button are test adapters.
 
 The fixture replaces app-store bindings and native-window side effects with inert test bindings. It suppresses remote font downloads and uses local font fallbacks. It does not reproduce user accent overrides, custom CSS, Electron window materials, translucency, OS rendering, or user-selected chat fonts. Native SDK styling may add layout differences. Live Desktop verification remains unperformed, and these screenshots do not claim otherwise.
