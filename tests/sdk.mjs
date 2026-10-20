@@ -30,13 +30,20 @@ export const host = {
     focusedSessionId: atom('demo-runtime'), activeSessionId: atom('demo-primary'), profile: atom('demo'), connectionId: atom('demo-connection'), focusedSessionOwner: atom({ connectionId: 'demo-connection', profile: 'demo' }), focusedSessionProfile: atom('demo'), gateway: atom('open'), busy: atom(false), busyBySession: atom({})
   },
   getGateway: () => gateway,
-  profileRoutes: () => routes,
+  profileRoutes: async () => {
+    routeCalls++
+    if (routeDelay) return new Promise((resolve, reject) => routePending.push({ resolve, reject }))
+    if (routeError) throw new Error('PRIVATE_ROUTE_ERROR')
+    return structuredClone(routes)
+  },
   navigate: path => { host.lastPath = path },
   onEvent: (type, fn) => { events.add(fn); return () => events.delete(fn) },
   request: (method, params, timeout) => request('ambient', method, params, timeout),
   requestProfile: (route, method, params, timeout) => request(route, method, params, timeout)
 }
 let routes = []
+let routeDelay = false, routeError = false, routeCalls = 0
+const routePending = []
 let responses = {}
 async function request(route, method, params, timeout) {
   if (method !== 'session.context_breakdown') throw new Error(`Unexpected RPC: ${method}`)
@@ -52,6 +59,10 @@ export const harness = {
   setError(value) { error = value },
   setDelay(value) { delay = value },
   setRoutes(value) { routes = value },
+  setRouteDelay(value) { routeDelay = value },
+  setRouteError(value) { routeError = value },
+  routeCount: () => routeCalls,
+  resolveRoutes() { routePending.shift().resolve(structuredClone(routes)) },
   setState(key, value) { host.state[key].set(value) },
   emit(event) { for (const fn of [...events]) fn(event) },
   resolve(id, value) { pending.get(id).resolve(value); pending.delete(id) },

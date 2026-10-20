@@ -1,7 +1,7 @@
 manifest_version: 2
 name: hermes-context-overview
-version: 1.1.0
-description: "Read-only in-conversation composer Context popover for occupancy, estimated categories and context-file metadata. Reuses session.context_breakdown; no collector or Python backend."
+version: 1.2.0
+description: "Read-only bottom status-bar Context popover for the focused conversation's occupancy, estimated categories and context-file metadata. Separate from prompt-cache hit-rate; no collector or Python backend."
 author: AsoTora
 license: MIT
 requires_hermes: ">=0.22.2"

@@ -39,9 +39,10 @@ async function fresh(open = true) {
   await page.route('**/*', route => route.request().url().startsWith(origin) ? route.continue() : route.abort())
   await page.goto(origin)
   await page.getByRole('button', { name: 'Context', exact: true }).first().waitFor()
-  if (open) { await trigger(0).click(); await shows('Estimated allocation') }
+  if (open) { await trigger().click(); await shows('Estimated allocation') }
 }
-const trigger = index => page.getByRole('button', { name: 'Context', exact: true }).nth(index)
+const trigger = () => page.getByRole('button', { name: 'Context', exact: true })
+async function focusConversation(index) { await page.getByRole('textbox', { name: `Message conversation ${index + 1}` }).focus() }
 async function state(key, value) { await page.evaluate(([key, value]) => window.harness.setState(key, value), [key, value]) }
 async function shows(text) { await page.getByText(text, { exact: false }).first().waitFor() }
 async function calls() { return page.evaluate(() => window.harness.getCalls()) }
@@ -52,16 +53,26 @@ async function refreshWith(value) {
 async function closed() { await page.getByRole('dialog').waitFor({ state: 'detached' }); await page.waitForTimeout(30) }
 async function expand(text) { await page.getByText(text, { exact: true }).click() }
 
-test('two simultaneous composers bind pointer and keyboard activation to their exact owners, lazily', async () => {
+test('one new bottom Context trigger preserves focused conversation, cache indicator, exact routes and lazy activation', async () => {
   await fresh(false)
-  assert.equal((await calls()).length, 0, 'No eager RPC from either mounted composer')
-  assert.equal(await trigger(0).innerText(), 'Context')
-  assert.equal(await trigger(1).innerText(), 'Context')
+  assert.equal((await calls()).length, 0, 'No eager RPC from the status bar')
+  assert.equal(await page.evaluate(() => window.harness.routeCount()), 0)
+  assert.equal(await trigger().count(), 1)
+  assert.equal(await page.locator('.demo-composer').getByRole('button', { name: 'Context' }).count(), 0)
+  const cache = page.getByRole('button', { name: 'prompt-cache hit-rate 98%', exact: true })
+  const cacheMarkup = await cache.evaluate(node => node.outerHTML)
+  await cache.click()
+  assert.equal(await page.getByRole('dialog').count(), 0)
+  assert.equal((await calls()).length, 0)
+  const bar = await page.getByRole('contentinfo').boundingBox()
+  assert.ok(bar.y >= 860 && bar.y + bar.height <= 900)
+  assert.equal(await trigger().innerText(), 'Context')
   await page.evaluate(() => window.harness.setResponses({
     'demo-runtime': { ...window.harness.example, context_used: 46080, model: 'FIRST_MODEL' },
     'demo-second': { ...window.harness.example, context_used: 76800, model: 'SECOND_MODEL' }
   }))
-  await trigger(1).click()
+  await focusConversation(1)
+  await trigger().click()
   await shows('SECOND_MODEL')
   assert.equal(await page.locator('[data-cell=occupied]').count(), 60)
   let call = (await calls()).at(-1)
@@ -69,22 +80,27 @@ test('two simultaneous composers bind pointer and keyboard activation to their e
   assert.deepEqual(call.route, { connectionId: 'source-b', profile: 'demo', targetProfile: 'demo', mode: 'remote' })
   assert.equal(await page.getByText('FIRST_MODEL', { exact: false }).count(), 0)
   await page.keyboard.press('Escape'); await closed()
-  assert.equal(await trigger(1).evaluate(node => node === document.activeElement), true)
-  // Keyboard focusin routes first's group before Enter; no pointer prerequisite.
-  await trigger(0).focus(); await page.keyboard.press('Enter')
+  assert.equal(await trigger().evaluate(node => node === document.activeElement), true)
+  // Focus the conversation first; status-bar focus leaves that owner unchanged.
+  await focusConversation(0)
+  await trigger().focus(); await page.keyboard.press('Enter')
   await shows('FIRST_MODEL')
   assert.equal(await page.locator('[data-cell=occupied]').count(), 36)
   call = (await calls()).at(-1)
   assert.equal(call.params.session_id, 'demo-runtime'); assert.equal(call.route, 'ambient')
   assert.equal(await page.getByText('SECOND_MODEL', { exact: false }).count(), 0)
   await page.keyboard.press('Escape'); await closed()
-  await trigger(1).focus(); await page.keyboard.press('Space'); await shows('SECOND_MODEL')
+  await focusConversation(1)
+  await trigger().focus(); await page.keyboard.press('Space'); await shows('SECOND_MODEL')
+  await trigger().click(); await closed()
+  await trigger().click(); await shows('SECOND_MODEL')
   await page.getByRole('heading', { name: 'Release checklist' }).click(); await closed()
   const count = (await calls()).length
   await page.waitForTimeout(100)
   assert.equal((await calls()).length, count)
   assert.equal(await page.evaluate(() => window.harness.listenerCount()), 0)
-  assert.deepEqual(await page.evaluate(() => window.harness.contributions.map(value => value.area)), ['composer.actions'])
+  assert.deepEqual(await page.evaluate(() => window.harness.contributions.map(value => value.area)), ['statusBar.right'])
+  assert.equal(await cache.evaluate(node => node.outerHTML), cacheMarkup, 'Synthetic cache indicator stays untouched')
 })
 test('truthful compact summary, category estimates and collapsed metadata disclosure', async () => {
   await fresh()
@@ -116,8 +132,10 @@ test('focus/owner switch closes, never retargets an open instance, and rejects l
   await page.getByRole('button', { name: 'Refresh context' }).click()
   await shows('Loading context breakdown')
   const old = (await calls()).at(-1).id
-  // Activating another composer must not reuse first's open popup or response.
-  await trigger(1).click()
+  // Focus another conversation, then deliberately reopen from the status bar.
+  await focusConversation(1); await closed()
+  assert.equal(await page.getByRole('textbox', { name: 'Message conversation 2' }).evaluate(node => node === document.activeElement), true)
+  await trigger().click()
   await page.waitForFunction(() => window.harness.getCalls().at(-1).params.session_id === 'demo-second')
   const current = (await calls()).at(-1).id
   await page.evaluate(({ old, current }) => {
@@ -126,7 +144,7 @@ test('focus/owner switch closes, never retargets an open instance, and rejects l
   }, { old, current })
   await shows('SECOND_MODEL')
   assert.equal(await page.getByText('STALE_MODEL', { exact: false }).count(), 0)
-  assert.equal(await trigger(0).getAttribute('aria-expanded'), 'false')
+  assert.equal(await trigger().getAttribute('aria-expanded'), 'true')
   const count = (await calls()).length
   await state('focusedSessionOwner', { connectionId: 'different-source', profile: 'demo' })
   await closed()
@@ -142,37 +160,100 @@ test('disconnect/reconnect with identical labels closes and rejects previous gat
   assert.equal((await calls()).at(-1).id, old)
   await page.evaluate(id => window.harness.resolve(id, { ...window.harness.example, model: 'OLD_GATEWAY' }), old)
   await page.evaluate(() => { window.harness.setDelay(false); window.harness.setResponse({ ...window.harness.example, model: 'NEW_GATEWAY' }) })
-  await trigger(0).click(); await shows('NEW_GATEWAY')
+  await trigger().click(); await shows('NEW_GATEWAY')
   assert.equal(await page.getByText('OLD_GATEWAY', { exact: false }).count(), 0)
 })
 test('missing/ambiguous routes and absent SDK owner fail closed with no ambient fallback', async () => {
   await fresh(false)
+  await focusConversation(1)
   await page.evaluate(() => window.harness.setRoutes([]))
-  await trigger(1).click(); await shows('no unique connection/profile route')
+  await trigger().click(); await shows('no unique connection/profile route')
   assert.equal((await calls()).length, 0)
   await page.keyboard.press('Escape'); await closed()
   await page.evaluate(() => window.harness.setRoutes([
     { connectionId: 'source-b', profile: 'alias-a', targetProfile: 'demo' },
     { connectionId: 'source-b', profile: 'alias-b', targetProfile: 'demo' }
   ]))
-  await trigger(1).click(); await shows('no unique connection/profile route')
+  await trigger().click(); await shows('no unique connection/profile route')
   assert.equal((await calls()).length, 0)
   await page.keyboard.press('Escape'); await closed()
   await page.evaluate(() => { window.harness.scopes.first.owner = null })
-  await trigger(0).click(); await shows('Session ownership is unresolved')
+  await focusConversation(0)
+  await trigger().click(); await shows('Session ownership is unresolved')
   assert.equal((await calls()).length, 0)
+  for (const owner of [{}, { profile: 'demo' }, { connectionId: 'demo-connection' }]) {
+    await page.keyboard.press('Escape'); await closed()
+    await state('focusedSessionOwner', owner)
+    await trigger().click(); await shows('Session ownership is unresolved')
+    assert.equal((await calls()).length, 0)
+  }
 })
 test('empty conversation, profile and session changes gate popup until deliberate reopen', async () => {
   await fresh()
   await state('focusedSessionId', null); await closed()
   await page.evaluate(() => { window.harness.scopes.first.session = null })
-  await trigger(0).click(); await shows('No session yet')
+  await trigger().click(); await shows('No session yet')
   await page.keyboard.press('Escape'); await closed()
   await page.evaluate(() => { window.harness.scopes.first.session = 'demo-runtime' })
-  await trigger(0).click(); await shows('Estimated allocation')
+  await focusConversation(0)
+  await trigger().click(); await shows('Estimated allocation')
   const count = (await calls()).length
   await state('profile', 'another-profile'); await closed()
   assert.equal((await calls()).length, count)
+})
+test('rejected asynchronous route discovery fails closed without leaking detail or retrying', async () => {
+  await fresh(false)
+  await focusConversation(1)
+  await page.evaluate(() => window.harness.setRouteError(true))
+  await trigger().click(); await shows('route discovery failed')
+  assert.equal((await calls()).length, 0)
+  assert.equal(await page.getByText('PRIVATE_ROUTE_ERROR').count(), 0)
+  await page.waitForTimeout(1200)
+  assert.equal(await page.evaluate(() => window.harness.routeCount()), 1)
+})
+for (const mutation of ['owner', 'session', 'profile', 'connection', 'reconnect', 'busy', 'dismiss']) {
+  test(`deferred asynchronous route lookup cannot dispatch after ${mutation} changes`, async () => {
+    await fresh(false)
+    await focusConversation(1)
+    await page.evaluate(() => window.harness.setRouteDelay(true))
+    await trigger().click(); await shows('Loading context breakdown')
+    await page.waitForFunction(() => window.harness.routeCount() === 1)
+    assert.equal((await calls()).length, 0)
+    if (mutation === 'owner') await state('focusedSessionOwner', { connectionId: 'source-c', profile: 'demo' })
+    if (mutation === 'session') await state('focusedSessionId', 'third-session')
+    if (mutation === 'profile') await state('profile', 'another-profile')
+    if (mutation === 'connection') await state('connectionId', 'another-connection')
+    if (mutation === 'reconnect') await page.evaluate(() => window.harness.reconnect())
+    if (mutation === 'busy') { await state('busyBySession', { 'demo-second': true }); await shows('Session is busy') }
+    if (mutation === 'dismiss') await page.keyboard.press('Escape')
+    if (mutation !== 'busy') await closed()
+    await page.evaluate(() => window.harness.resolveRoutes())
+    await page.waitForTimeout(100)
+    assert.equal((await calls()).length, 0, 'Never dispatch an RPC after an asynchronous authority boundary changed')
+    assert.equal(await page.locator('[data-cell]').count(), 0)
+  })
+}
+test('late busy-session reply stays hidden until a fresh idle query', async () => {
+  await fresh()
+  await page.evaluate(() => window.harness.setDelay(true))
+  await page.getByRole('button', { name: 'Refresh context' }).click()
+  await page.waitForFunction(() => window.harness.getCalls().length === 2)
+  const old = (await calls()).at(-1).id
+  await state('busyBySession', { 'demo-runtime': true }); await shows('Session is busy')
+  await page.evaluate(id => window.harness.resolve(id, { ...window.harness.example, model: 'STALE_BUSY' }), old)
+  assert.equal(await page.locator('[data-cell]').count(), 0)
+  await page.evaluate(() => { window.harness.setDelay(false); window.harness.setResponse({ ...window.harness.example, model: 'FRESH_IDLE' }) })
+  await state('busyBySession', { 'demo-runtime': false }); await shows('FRESH_IDLE')
+  assert.equal(await page.getByText('STALE_BUSY', { exact: false }).count(), 0)
+})
+test('closed status-bar control makes no background request across two idle intervals', async () => {
+  await fresh()
+  await page.keyboard.press('Escape'); await closed()
+  const count = (await calls()).length
+  await page.clock.install()
+  await page.clock.runFor(120001)
+  assert.equal((await calls()).length, count)
+  assert.equal(await page.evaluate(() => window.harness.listenerCount()), 0)
 })
 test('unknown RPC method has quiet compatibility error without retries or stale data', async () => {
   await fresh()
@@ -244,17 +325,19 @@ test('completion/compression/reclaim invalidation only while open; disposal clea
   await page.evaluate(() => window.harness.dispose())
   await page.waitForFunction(() => Object.values(window.harness.atomListeners()).every(count => count === 0))
 })
-test('synthetic in-conversation screenshots: light/dark, narrow/wide, contained popup and keyboard dismissal', async () => {
+test('synthetic bottom status-bar screenshots: light/dark, narrow/wide, contained popup and keyboard dismissal', async () => {
   await fresh()
   const samples = []
   for (const theme of ['light', 'dark']) for (const width of [1280, 390]) {
     await page.evaluate(theme => document.documentElement.classList.toggle('dark', theme === 'dark'), theme)
     await page.setViewportSize({ width, height: 900 })
     await page.keyboard.press('Escape'); await closed()
-    const index = width === 390 ? 1 : 0
-    await trigger(index).focus(); await page.keyboard.press('Enter'); await shows('Estimated allocation')
+    await focusConversation(width === 390 ? 1 : 0)
+    await trigger().focus(); await page.keyboard.press('Enter'); await shows('Estimated allocation')
     await page.waitForTimeout(80)
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    const statusbar = await page.getByRole('contentinfo').boundingBox()
+    assert.ok(statusbar.y >= 860 && statusbar.y + statusbar.height <= 900, 'Bottom status bar remains inside every viewport')
     const box = await page.getByRole('dialog').boundingBox()
     assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 900)
     await expand('Context files · metadata only')
@@ -276,7 +359,7 @@ test('synthetic in-conversation screenshots: light/dark, narrow/wide, contained 
     samples.push({ theme, width, secondaryTextContrast: contrast })
     await page.screenshot({ path: resolve(root, `docs/screenshots/harness-${theme}-${width}.png`), fullPage: true })
     await page.keyboard.press('Escape'); await closed()
-    assert.equal(await trigger(index).evaluate(node => document.activeElement === node), true)
+    assert.equal(await trigger().evaluate(node => document.activeElement === node), true)
   }
   await writeFile(resolve(root, '.local/browser-visual-checks.json'), JSON.stringify(samples, null, 2))
 })
