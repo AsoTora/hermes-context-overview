@@ -1,4 +1,4 @@
-# Theme support — 1.2.3
+# Theme support — 1.2.4
 
 The popup follows all 12 built-in themes and their 24 light/dark palettes through native CSS tokens. This document covers the design, the review evidence and its limits; it is not live Desktop verification.
 

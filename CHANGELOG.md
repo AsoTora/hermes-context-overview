@@ -2,6 +2,11 @@
 
 Versions describe source milestones; the 1.0.0–1.2.0 entries were not previously tagged GitHub releases. Dates are 2026-10-20, when these changes landed.
 
+## [1.2.4] - 2026-10-20
+
+### Fixed
+- Catalog bump script no longer builds a markdown link from variables, clearing the install scanner's `caution` finding. No runtime changes.
+
 ## [1.2.3] - 2026-10-20
 
 ### Changed

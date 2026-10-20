@@ -40,7 +40,9 @@ gh api -X PUT "repos/$FORK/contents/$ENTRY" \
 NOTES=$(gh release view "$TAG" -R "$REPO" --json body --jq .body)
 gh pr create -R "$UPSTREAM" --base main --head "${FORK%%/*}:$BRANCH" \
   --title "chore(catalog): bump hermes-context-overview to $VERSION" \
-  --body "Bumps the Context Overview pin to [$TAG](https://github.com/$REPO/releases/tag/$TAG).
+  --body "Bumps the Context Overview pin to $TAG.
+
+Release: https://github.com/$REPO/releases/tag/$TAG
 
 Commit range for review: https://github.com/$REPO/compare/$OLD...$NEW
 

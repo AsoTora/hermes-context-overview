@@ -1,4 +1,4 @@
-# Verification boundary — 1.2.3
+# Verification boundary — 1.2.4
 
 ## Verification scope
 

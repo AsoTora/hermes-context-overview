@@ -38,8 +38,8 @@ class ReleaseTests(unittest.TestCase):
         return result
 
     def test_actual_archive_extraction_installable_layout_and_entry_syntax(self):
-        self.cli('pack', '--tag', 'v1.2.3')
-        archive = self.out / 'hermes-context-overview-1.2.3.tar.gz'
+        self.cli('pack', '--tag', 'v1.2.4')
+        archive = self.out / 'hermes-context-overview-1.2.4.tar.gz'
         extracted = self.root / 'installed'
         extracted.mkdir()
         with tarfile.open(archive) as tar:
@@ -74,8 +74,8 @@ class ReleaseTests(unittest.TestCase):
         readme = (self.root / 'README.md').read_text()
         for name in sorted(expected):
             self.assertIn('](' + name + ')', readme)
-        self.cli('pack', '--tag', 'v1.2.3')
-        with tarfile.open(self.out / 'hermes-context-overview-1.2.3.tar.gz') as tar:
+        self.cli('pack', '--tag', 'v1.2.4')
+        with tarfile.open(self.out / 'hermes-context-overview-1.2.4.tar.gz') as tar:
             for name in sorted(expected):
                 stream = tar.extractfile(name)
                 self.assertIsNotNone(stream)
@@ -86,7 +86,7 @@ class ReleaseTests(unittest.TestCase):
                 path = self.root / name
                 data = path.read_bytes()
                 path.unlink()
-                self.cli('check', '--tag', 'v1.2.3', success=False)
+                self.cli('check', '--tag', 'v1.2.4', success=False)
                 path.write_bytes(data)
 
     def test_rebuild_deterministic_despite_source_mtimes(self):
@@ -103,7 +103,7 @@ class ReleaseTests(unittest.TestCase):
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text('DO_NOT_PACKAGE')
         self.cli('pack')
-        with tarfile.open(self.out / 'hermes-context-overview-1.2.3.tar.gz') as tar:
+        with tarfile.open(self.out / 'hermes-context-overview-1.2.4.tar.gz') as tar:
             self.assertEqual(tar.getnames(), list(release.FILES))
             for member in tar.getmembers():
                 stream = tar.extractfile(member)
@@ -112,7 +112,7 @@ class ReleaseTests(unittest.TestCase):
                 self.assertNotIn(b'DO_NOT_PACKAGE', stream.read())
 
     def test_corrupt_each_asset_or_checksum_is_rejected(self):
-        for name in (*release.names('1.2.3'), 'SHA256SUMS'):
+        for name in (*release.names('1.2.4'), 'SHA256SUMS'):
             with self.subTest(name=name):
                 self.cli('pack')
                 p = self.out / name
@@ -120,33 +120,33 @@ class ReleaseTests(unittest.TestCase):
                 self.cli('verify', success=False)
 
     def test_invalid_and_mismatched_tags_fail_closed(self):
-        for tag in ('v1.2.1', 'v1.2.0', '1.2.3', 'v01.2.3', 'v1.2.3-rc.1', '', 'v1.2.3\n', 'refs/tags/v1.2.3', '../../x'):
+        for tag in ('v1.2.1', 'v1.2.0', '1.2.4', 'v01.2.4', 'v1.2.4-rc.1', '', 'v1.2.4\n', 'refs/tags/v1.2.4', '../../x'):
             with self.subTest(tag=tag):
                 self.cli('pack', '--tag', tag, success=False)
         self.assertFalse(self.out.exists())
 
     def test_manifest_version_and_private_dependency_contract(self):
         original = (self.root / 'package.json').read_text()
-        for field, value in (('version', '1.2.0'), ('version', '01.2.3'), ('private', False), ('dependencies', {'bad': '1'})):
+        for field, value in (('version', '1.2.0'), ('version', '01.2.4'), ('private', False), ('dependencies', {'bad': '1'})):
             package = json.loads(original)
             package[field] = value
             (self.root / 'package.json').write_text(json.dumps(package))
             self.cli('check', success=False)
         (self.root / 'package.json').write_text(original)
-        (self.root / 'plugin.yaml').write_text('version: 1.2.3\nversion: 1.2.3\n')
+        (self.root / 'plugin.yaml').write_text('version: 1.2.4\nversion: 1.2.4\n')
         self.cli('check', success=False)
 
     def test_absent_empty_duplicate_or_noncurrent_notes_block(self):
-        for changelog in ('# Changelog\n', '## [1.2.3] - 2026-10-20\n',
-                          '## [1.2.3] - 2026-10-20\n- Good\n## [1.2.3] - 2026-10-20\n- Duplicate\n',
-                          '## [1.2.0] - 2026-10-20\n- Old\n## [1.2.3] - 2026-10-20\n- New\n'):
+        for changelog in ('# Changelog\n', '## [1.2.4] - 2026-10-20\n',
+                          '## [1.2.4] - 2026-10-20\n- Good\n## [1.2.4] - 2026-10-20\n- Duplicate\n',
+                          '## [1.2.0] - 2026-10-20\n- Old\n## [1.2.4] - 2026-10-20\n- New\n'):
             (self.root / 'CHANGELOG.md').write_text(changelog)
             self.cli('pack', success=False)
 
     def test_notes_exactly_current_section(self):
-        output = self.cli('notes', '--tag', 'v1.2.3').stdout
+        output = self.cli('notes', '--tag', 'v1.2.4').stdout
         changelog = (self.root / 'CHANGELOG.md').read_text()
-        self.assertEqual(output, changelog[changelog.index('## [1.2.3]'):changelog.index('## [1.2.2]')].strip() + '\n')
+        self.assertEqual(output, changelog[changelog.index('## [1.2.4]'):changelog.index('## [1.2.3]')].strip() + '\n')
         self.assertNotIn('## [1.2.1]', output)
 
     def test_symlink_allowlisted_input_rejected(self):
@@ -157,7 +157,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_archive_injection_rejected_even_with_updated_checksum(self):
         self.cli('pack')
-        archive = self.out / 'hermes-context-overview-1.2.3.tar.gz'
+        archive = self.out / 'hermes-context-overview-1.2.4.tar.gz'
         with tarfile.open(archive, 'w:gz') as tar:
             info = tarfile.TarInfo('../private')
             info.size = 4
