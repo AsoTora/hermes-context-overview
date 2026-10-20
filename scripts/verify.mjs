@@ -7,8 +7,7 @@ const root = resolve(import.meta.dirname, '..')
 const local = resolve(root, '.local/evidence')
 await mkdir(local, { recursive: true })
 const commands = [
-  ['node', ['--check', 'desktop/plugin.js'], 'final-node-check.log'],
-  ['pnpm', ['test'], 'final-tests.log'],
+  ['pnpm', ['gate'], 'final-gate.log'],
   ['hermes', ['plugins', 'doctor', '--ci', '.'], 'final-doctor.log'],
   ['hermes', ['plugins', 'validate', '.', '--install-deps'], 'final-validate.log']
 ]
@@ -23,7 +22,7 @@ for (const [command, args, log] of commands) {
 const files = []
 async function inventory(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (['node_modules', '.local', '.git'].includes(entry.name)) continue
+    if (['node_modules', '.local', '.git', 'dist', '__pycache__'].includes(entry.name)) continue
     const path = resolve(directory, entry.name)
     if (entry.isDirectory()) await inventory(path)
     else if (entry.isFile()) { const value = await readFile(path); files.push({ path: relative(root, path), bytes: value.length, sha256: createHash('sha256').update(value).digest('hex') }) }

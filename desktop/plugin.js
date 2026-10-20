@@ -100,25 +100,25 @@ function ContextPanel({ scope }) {
   const busy = sessionBusy(scope)
   const ownershipMissing = !ownerKnown(scope)
   const valid = () => identity === stamp(snapshot())
-  const enabled = Boolean(valid() && scope.session && scope.gateway === 'open' && !busy && !ownershipMissing)
+  const enabled = Boolean(valid() && scope.session && scope.gateway === 'open' && !ownershipMissing)
   const query = useQuery({
-    queryKey: [ID, identity, busy, revision], enabled,
+    queryKey: [ID, identity, revision], enabled,
     queryFn: async ({ signal }) => {
-      if (signal.aborted || !valid() || sessionBusy(scope)) throw new Error('scope-changed')
+      if (signal.aborted || !valid()) throw new Error('scope-changed')
       // Resolve again at dispatch: a disconnected profile descriptor is not authority.
       const target = await routeFor(scope)
       // Route discovery is asynchronous; no captured owner may dispatch after it changes.
-      if (signal.aborted || !valid() || sessionBusy(scope)) throw new Error('scope-changed')
+      if (signal.aborted || !valid()) throw new Error('scope-changed')
       if (target.blocked) throw Object.assign(new Error(target.blocked), { code: 'route-unavailable' })
       const params = { session_id: scope.session }
       const payload = target.ambient ? await host.request('session.context_breakdown', params, 15000) : await host.requestProfile(target.route, 'session.context_breakdown', params, 15000)
-      if (signal.aborted || !valid() || sessionBusy(scope)) throw new Error('scope-changed')
+      if (signal.aborted || !valid()) throw new Error('scope-changed')
       const value = normalize(payload)
       if (!value.max) throw new Error('missing-window')
       return value
     },
     staleTime: 15000, gcTime: 0,
-    retry: (count, error) => valid() && !sessionBusy(scope) && count < 2 && error?.message !== 'scope-changed' && !['route-unavailable', -32601, 4004].includes(error?.code) && !/method.*(not found|unknown)|unknown method/i.test(error?.message ?? ''),
+    retry: (count, error) => valid() && count < 2 && error?.message !== 'scope-changed' && !['route-unavailable', -32601, 4004].includes(error?.code) && !/method.*(not found|unknown)|unknown method/i.test(error?.message ?? ''),
     retryDelay: count => [1000, 4000][Math.min(count, 1)],
     refetchInterval: query => query.state.status === 'error' ? false : 60000,
     refetchIntervalInBackground: false, refetchOnWindowFocus: false, placeholderData: undefined
@@ -135,17 +135,17 @@ function ContextPanel({ scope }) {
       if (event.type === 'session.reclaimed' || event.type === 'message.complete' || (event.type === 'status.update' && ['compacting', 'compressing', 'compacted', 'ready'].includes(payload.kind))) setRevision(value => value + 1)
     })
   }, [enabled, identity])
-  const refresh = () => { if (valid() && !sessionBusy(scope)) setRevision(value => value + 1) }
+  const refresh = () => { if (valid()) setRevision(value => value + 1) }
   let message = null
   if (!scope.session) message = 'No session yet. Send a message in this conversation first.'
   else if (scope.gateway !== 'open') message = 'Gateway disconnected. Reopen Context after reconnecting.'
   else if (ownershipMissing) message = 'Session ownership is unresolved. A Desktop SDK with focused session ownership is required.'
-  else if (busy) message = 'Session is busy. Context will refresh when this turn ends.'
   else if (query.isFetching || query.isPending) message = 'Loading context breakdown…'
   if (!message && query.isError) message = query.error?.code === 'route-unavailable' ? query.error.message : query.error?.message === 'missing-window' ? 'No model window is available yet. Bounded retries finished; refresh after the runtime is ready.' : [-32601, 4004].includes(query.error?.code) || /method.*(not found|unknown)|unknown method/i.test(query.error?.message ?? '') ? 'Context breakdown is unavailable on this gateway. Hermes ≥0.22.2 with session.context_breakdown is required.' : 'Context could not be refreshed. No previous snapshot is shown. Check the gateway and retry.'
   return jsxs('div', { children: [
     jsxs('header', { className: 'co-header', children: [jsx('h2', { children: 'Conversation context' }), jsx(Button, { type: 'button', variant: 'ghost', size: 'sm', disabled: !enabled || query.isFetching, onClick: refresh, children: 'Refresh context' })] }),
     jsx('code', { className: 'co-muted', children: `${text(scope.focusedProfile)} · ${text(scope.session, 'New conversation')}` }),
+    busy && jsx('p', { className: 'co-muted', role: 'status', children: 'Turn in progress — latest available snapshot; usage may lag until completion.' }),
     message ? jsx('p', { role: query.isError ? 'alert' : 'status', children: message }) : query.data && jsx(Details, { value: query.data }),
     jsx('p', { className: 'co-muted', children: 'Read-only · updates only while open · no prompt/message bodies' })
   ] })
@@ -171,7 +171,7 @@ export function ContextControl() {
     if (captured && stamp(captured) === stamp(snapshot())) setScope(captured)
   }
   return jsxs(Popover, { open: valid, onOpenChange: openChange, children: [
-    jsx(PopoverTrigger, { asChild: true, children: jsx(Button, { type: 'button', variant: 'ghost', size: 'sm', style: { height: '100%', padding: '0 6px', border: 0, borderRadius: 0, fontSize: 11, color: 'var(--ui-text-secondary)' }, onPointerDown: arm, onFocus: arm, onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') arm() }, children: 'Context' }) }),
+    jsx(PopoverTrigger, { asChild: true, children: jsxs(Button, { type: 'button', variant: 'ghost', size: 'sm', style: { height: '100%', padding: '0 6px', border: 0, borderRadius: 0, fontSize: 11, color: 'var(--ui-text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 4 }, onPointerDown: arm, onFocus: arm, onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') arm() }, children: [jsxs('svg', { width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, focusable: 'false', style: { flexShrink: 0 }, children: [jsx('path', { d: 'M21 12a9 9 0 1 1-9-9v9Z' }), jsx('path', { d: 'M15 3.5A9 9 0 0 1 20.5 9H15Z' })] }), 'Context'] }) }),
     valid && jsxs(PopoverContent, { side: 'top', align: 'end', collisionPadding: 8, className: 'hermes-context-overview', 'aria-label': 'Conversation context', onCloseAutoFocus: event => { if (stamp(scope) !== stamp(snapshot())) event.preventDefault() }, children: [jsx('style', { children: styles }), jsx(ContextPanel, { scope }, stamp(scope))] })
   ] })
 }

@@ -1,6 +1,6 @@
 # Context Overview for Hermes Desktop
 
-**Version 1.2.0:** one new **Context** button in the **bottom status bar**, alongside the existing prompt-cache hit-rate, t/s and RAM indicators. The existing **98% cache indicator is untouched**; it is not the context button. Composer controls have been removed. There is no top-right/titlebar control, sidebar page, command-palette navigation or new collector.
+**Version 1.2.1:** one new **Context** button with a monochrome context-usage icon in the **bottom status bar**, alongside the existing prompt-cache hit-rate, t/s and RAM indicators. The existing **98% cache indicator is untouched**; it is not the context button. Composer controls have been removed. There is no top-right/titlebar control, sidebar page, command-palette navigation or new collector. Context can be opened and refreshed **during a running turn**, with a latest-snapshot/usage-lag notice.
 
 ![Synthetic browser harness: two conversations and a new bottom status-bar Context popover](docs/screenshots/harness-dark-1280.png)
 
@@ -15,7 +15,7 @@ Focus the conversation you want to inspect, then click **Context** in the bottom
 - Optional, initially collapsed explanations, context-file metadata and data-quality notes.
 - An explicit refresh button; idle refresh every 60 seconds **only while open**.
 
-Escape or an outside interaction dismisses it. Escape returns focus to the trigger. Moving to another conversation, changing owner/profile/connection or reconnecting closes the old popup rather than silently retargeting it. Open Context again when needed. Busy sessions show a waiting state instead of mid-turn estimates. A fresh conversation without a runtime session shows an empty state.
+Escape or an outside interaction dismisses it. Escape returns focus to the trigger. Moving to another conversation, changing owner/profile/connection or reconnecting closes the old popup rather than silently retargeting it. Open Context again when needed. Running turns still show the latest available metadata, with “Turn in progress — latest available snapshot; usage may lag until completion.” This is not a live per-token counter: manual refresh, open-only 60-second polling and completion/compression events update the snapshot. A fresh conversation without a runtime session shows an empty state.
 
 ## Per-conversation ownership
 
@@ -23,7 +23,7 @@ Escape or an outside interaction dismisses it. Escape returns focus to the trigg
 
 Binding happens at user activation to the host’s already focused conversation. The instance captures the public `focusedSessionId` and connection-qualified `focusedSessionOwner`, ambient connection/profile, gateway identity and lifecycle epoch. It keeps that identity fixed until dismissal. Any identity change immediately gates content and unmounts the query; pending old-scope responses cannot paint a new conversation. Forced dismissal suppresses focus return so it cannot steal focus from a newly focused conversation; normal Escape returns focus to the status-bar trigger.
 
-RPC dispatch **awaits `host.profileRoutes()`** inside the query and uses the exact descriptor plus `requestProfile()` for a foreign owner, or `host.request()` only for a matching ambient owner. After asynchronous discovery, the captured session/owner/connection/profile/gateway and busy state are checked again before dispatch. Missing/ambiguous routes, rejected discovery or incomplete owner metadata fail closed with no ambient fallback. Busy state comes from `busyBySession[capturedSession]` when available, otherwise the focused busy atom only while captured identity still matches. Other sessions’ busy updates do not hide or refetch this popup.
+RPC dispatch **awaits `host.profileRoutes()`** inside the query and uses the exact descriptor plus `requestProfile()` for a foreign owner, or `host.request()` only for a matching ambient owner. After asynchronous discovery, captured session/owner/connection/profile/gateway authority is checked again before dispatch. Missing/ambiguous routes, rejected discovery or incomplete owner metadata fail closed with no ambient fallback. Busy state comes from `busyBySession[capturedSession]` when available, otherwise the focused busy atom only while captured identity still matches. Busy is only a lag notice, not a query/cache identity or dispatch block. Same-owner replies remain usable across busy transitions. Other sessions’ busy updates do not hide or refetch this popup.
 
 The host publishes focused ownership; the status bar preserves it. The plugin does not invent session render props, import private composer hooks, scan host DOM, or patch core. Source references and the explicitly emulated host seam are recorded in [verification](docs/verification.md). Browser tests are not proof of live native integration or alternate host layouts.
 
@@ -43,13 +43,15 @@ The implementation was checked against runtime `d923a5eb487a17c0a68801bba9ef0f56
 
 ## Install / enable / remove
 
+For versioned release assets, checksum verification, upgrades and rollback, follow [release installation](docs/releases.md). Releases contain an allowlisted root-layout package and a standalone `plugin.js`; npm publishing is intentionally disabled. See [CHANGELOG](CHANGELOG.md), [contributing](CONTRIBUTING.md) and [security reporting](SECURITY.md).
+
 Source validation does not install the plugin or establish that Desktop loaded it. For a standalone disk installation, place `desktop/plugin.js` at:
 
 ```text
-$HERMES_HOME/desktop-plugins/hermes-context-overview/plugin.js
+~/.hermes/desktop-plugins/hermes-context-overview/plugin.js
 ```
 
-The directory must match the plugin ID. The standalone entry defaults enabled while respecting an explicit disabled choice. Check **Context Overview** in Desktop’s Plugins UI; use **Reload desktop plugins** if necessary. Unified package installation is also supported by Hermes’s plugin installer. For a package-managed copy, use Desktop **Rescan** to synchronize the package source, then enable its Desktop half if needed. No Python backend is included or needs enabling. No restart is required by this plugin.
+Use the running Desktop app's plugin root if customized; connected gateway/profile selection does not change this app-level frontend path. The directory must match the plugin ID. The standalone entry defaults enabled while respecting an explicit disabled choice. Check **Context Overview** in Desktop’s Plugins UI; use **Reload desktop plugins** if necessary. Unified package installation is also supported by Hermes’s plugin installer. For a package-managed copy, use Desktop **Rescan** to synchronize the package source, then enable its Desktop half if needed. No Python backend is included or needs enabling. No restart is required by this plugin.
 
 To roll back, disable the plugin and remove/uninstall it through its owning installation mechanism. It writes no session data, settings, files or plugin storage. Do not remove a package-managed app-root copy while leaving its source installed.
 
@@ -64,15 +66,15 @@ Queries and event listeners exist only while a popup is open. Explicit refresh, 
 ```sh
 pnpm install --offline --frozen-lockfile --ignore-scripts
 # Set PLAYWRIGHT_BROWSERS_PATH to an existing Chromium cache when available.
-node --check desktop/plugin.js
-pnpm test
+pnpm gate
+# Optional local native tooling, separate from the portable gate:
 hermes plugins doctor --ci .
 hermes plugins validate . --install-deps
 ```
 
 Dev dependencies only; production is plain ESM with no build step. Browser tests mount the actual registered contribution in **one synthetic bottom status bar and two simultaneous conversations** using real React/React Query and **Radix UI 1.6.7**, the inspected host’s popover primitive/version. Gateway state, focus routing, contribution registry and Button/native wrapper styling remain explicit seams. Tests cover pointer/keyboard ownership, exact owner RPC routing, different budgets, stale-result isolation, lifecycle/retry/privacy behavior and four public screenshots.
 
-`node scripts/verify.mjs` retains full command logs and candidate hashes under ignored `.local/evidence/`. The known doctor `No __init__.py` failure is reported as a Desktop-only tooling limitation, not hidden with a dummy Python shim. See [verification](docs/verification.md) for results and limits. No live native renderer, connected gateway, catalog approval or publication is claimed.
+`pnpm gate` checks syntax, version/changelog consistency, all entry/browser tests, release negative tests, deterministic packaging and archive/content/checksum verification without Hermes installed. Node 22/24, pnpm 10.33.0 and Python 3.10+ stdlib are supported tooling targets. `node scripts/verify.mjs` runs that gate plus optional native tooling and retains full command logs and candidate hashes under ignored `.local/evidence/`, excluding `dist/` and evidence itself. The known doctor `No __init__.py` failure is reported as a Desktop-only tooling limitation, not hidden with a dummy Python shim. See [verification](docs/verification.md) for results and limits. No live native renderer, connected gateway, catalog approval or publication is claimed.
 
 This package adds a separate bottom status-bar inspector by reusing the existing RPC, not by changing native cache/performance indicators, forking core or adding a collector.
 
