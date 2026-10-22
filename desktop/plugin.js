@@ -10,7 +10,13 @@ let gatewaySequence = 0
 const number = value => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
 const text = (value, fallback = '') => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '').slice(0, 500) : fallback
 const fmt = value => value === null ? 'Unknown' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value)
-const percentage = (value, max) => max > 0 && value !== null ? `${(value / max * 100).toFixed(1)}%` : '—'
+// Payload counts are safe integers. Round their exact ratio, not a floating tie.
+const roundedRatio = (value, max, scale) => (BigInt(value) * BigInt(scale) * 2n + BigInt(max)) / (BigInt(max) * 2n)
+const percentage = (value, max) => {
+  if (!(max > 0) || value === null) return '—'
+  const tenths = roundedRatio(value, max, 1000)
+  return `${tenths / 10n}.${tenths % 10n}%`
+}
 const categoryTokens = { system_prompt: 'system', tool_definitions: 'tools', rules: 'rules', skills: 'skills', mcp: 'mcp', subagent_definitions: 'subagents', memory: 'memory', conversation: 'conversation' }
 const color = id => categoryTokens[id] ? `var(--co-${categoryTokens[id]})` : 'var(--co-muted)'
 
@@ -34,9 +40,18 @@ export function normalize(payload) {
   const sourceLabel = { provider_usage: 'Provider-reported occupancy', provider_usage_plus_estimate: 'Provider usage + estimated delta', local_estimate: 'Local estimated occupancy', unknown: 'Unknown occupancy provenance' }[source]
   if (source === 'unknown') issues.push('The gateway did not identify occupancy provenance.')
   const known = max > 0 && used !== null
+  // Independent estimates are not occupancy. Compare without coercion or rescaling.
+  const totals = [sum, estimate].filter(value => value !== null)
+  const overflow = max > 0 && (categories.some(row => row.tokens > max) || totals.some(value => value > max) || (categories.length > 0 && sum === null))
+  // A conservative display heuristic, not a diagnosis: >=2x and >=10% of window.
+  const severe = known && totals.some(value => {
+    const high = BigInt(Math.max(value, used)), low = BigInt(Math.min(value, used))
+    return high > low && high >= low * 2n && (high - low) * 10n >= BigInt(max)
+  })
+  const allocationWarning = overflow ? 'overflow' : severe ? 'mismatch' : null
   const free = known ? Math.max(0, max - used) : null
-  const occupiedCells = known ? Math.min(100, Math.round(used / max * 100)) : 0
-  return { max, used, free, known, occupiedCells, categories, files, sum, estimate, source, sourceLabel, estimated: source !== 'provider_usage' || payload.context_estimated === true, model: text(payload.model, 'Unknown model') || 'Unknown model', issues: [...new Set(issues)], excess: known ? Math.max(0, used - max) : 0 }
+  const occupiedCells = known ? Math.min(100, Number(roundedRatio(used, max, 100))) : 0
+  return { max, used, free, known, occupiedCells, categories, files, sum, estimate, allocationWarning, source, sourceLabel, estimated: source !== 'provider_usage' || payload.context_estimated === true, model: text(payload.model, 'Unknown model') || 'Unknown model', issues: [...new Set(issues)], excess: known ? Math.max(0, used - max) : 0 }
 }
 
 function gatewayKey() {
@@ -80,9 +95,14 @@ function Budget({ value }) {
 function Details({ value }) {
   return jsxs('div', { children: [
     jsx(Budget, { value }),
-    jsx('h3', { children: 'Estimated allocation' }),
+    value.allocationWarning && jsxs('section', { role: 'alert', 'aria-label': 'Allocation reliability warning', children: [
+      jsx('strong', { children: value.allocationWarning === 'overflow' ? 'Category estimates exceed the model window' : 'Category estimates disagree substantially with occupancy' }),
+      jsx('p', { children: 'Breakdown may be unreliable; it is not extra occupied context. Some gateways count compressed ancestors instead of the current conversation.' }),
+      jsx('p', { children: 'Affected gateways require a Hermes backend update with the context-lineage fix. A fixed version is not yet confirmed; this plugin cannot correct backend counts.' })
+    ] }),
+    jsxs('h3', { children: [jsx('span', { children: 'Estimated allocation' }), ' · % of window'] }),
     value.categories.length ? jsx('ul', { className: 'co-categories', 'aria-label': 'Context categories', children: value.categories.map(row => jsxs('li', { children: [jsxs('span', { className: 'co-category', children: [jsx('span', { className: 'co-swatch', style: { background: color(row.id) }, 'aria-hidden': true }), row.label] }), jsx('span', { children: `≈ ${fmt(row.tokens)} · ${percentage(row.tokens, value.max)}` })] }, row.key)) }) : jsx('p', { children: 'No category estimates are available yet. A resumed or rebuilding session may not have a breakdown.' }),
-    jsxs('details', { children: [jsx('summary', { children: 'How estimates differ' }), jsx('p', { className: 'co-muted', children: `Category sum: ${fmt(value.sum)} · Reported estimate: ${fmt(value.estimate)}. Category estimates are independent of overall occupancy and never rescaled to match it. Optional categories may be absent.` }), value.known && value.sum !== null && value.sum !== value.used && jsx('p', { className: 'co-muted', children: `Estimates differ from overall occupancy by ${fmt(Math.abs(value.sum - value.used))} tokens (${value.sum > value.used ? 'higher' : 'lower'}). This is estimate drift, not additional budget.` })] }),
+    jsxs('details', { children: [jsx('summary', { children: 'How estimates differ' }), jsx('p', { className: 'co-muted', children: `Category sum: ${fmt(value.sum)} · Reported estimate: ${fmt(value.estimate)}. Category estimates are independent of overall occupancy and never rescaled to match it. Optional categories may be absent.` }), value.known && value.sum !== null && value.sum !== value.used && jsx('p', { className: 'co-muted', children: `Estimates differ from overall occupancy by ${fmt(Math.abs(value.sum - value.used))} tokens (${value.sum > value.used ? 'higher' : 'lower'}). Differences can reflect estimation, snapshot timing or a backend counting defect; they are not additional budget.` })] }),
     jsxs('details', { children: [jsx('summary', { children: 'Context files · metadata only' }), jsx('p', { className: 'co-muted', children: 'Load status and size only. Files are not opened; estimates are not added again.' }), value.files.length ? jsx('ul', { className: 'co-files', children: value.files.map((file, index) => jsxs('li', { children: [jsx('strong', { children: file.label }), jsx('code', { children: file.path || 'No path supplied' }), jsx('p', { className: 'co-muted', children: `${file.loaded} · ${file.status} · ${fmt(file.chars)} chars · ≈ ${fmt(file.tokens)} tokens` })] }, index)) }) : jsx('p', { children: 'No context-file metadata was supplied.' })] }),
     value.issues.length > 0 && jsxs('details', { children: [jsx('summary', { children: 'Data quality notes' }), jsx('ul', { children: value.issues.map(issue => jsx('li', { children: issue }, issue)) })] })
   ] })

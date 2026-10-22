@@ -43,6 +43,12 @@ The host publishes focused ownership; the status bar preserves it. The plugin do
 - **Context files:** reported label/path, character count, token estimate, loaded flag and status only. The plugin does not open files or add file estimates to categories again.
 - Raw system prompts, messages, memory contents, individual tool/skill costs and session titles are not fetched or fabricated. The existing conversation heading provides the name; the popup shows profile/runtime ID as secondary metadata.
 
+### Unreliable category breakdowns
+
+A visible warning appears when a category row, category sum or reported estimate exceeds the model window. It also appears for severe disagreement between occupancy and either available total: at least a 2× ratio and an absolute difference of at least 10% of the window (including zero vs a substantial nonzero total). This is a conservative display heuristic, not proof of a particular backend defect; smaller discrepancies can still be defects. Missing/invalid occupancy does not suppress a detectable category overflow.
+
+Some Hermes gateway reads expand compressed conversation ancestors when estimating categories. **v1.2.5 warns; it cannot repair those backend counts.** Affected gateways require a Hermes backend update containing the context-lineage fix; a fixed backend version is not yet confirmed. The declared RPC minimum below is not a claim that the lineage fix is included. Counts, provenance and independent estimates stay visible and unscaled; no corrected current-conversation count is invented.
+
 ## Requirements
 
 `plugin.yaml` declares **Hermes >=0.22.2** as the RPC baseline, not a guarantee that every older Desktop build has the necessary SDK. The host must expose the public `statusBar.right` render contribution, native `Button`/`Popover*`, React Query, `focusedSessionId`, `focusedSessionOwner`, connection/profile/gateway state and the existing tree ownership routing. Foreign-owner sessions also need `profileRoutes()` / `requestProfile()`.

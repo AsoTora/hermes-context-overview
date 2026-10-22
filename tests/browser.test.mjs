@@ -5,6 +5,7 @@ import { chromium } from 'playwright'
 import { createServer } from 'node:http'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { lineageOverflow } from './fixtures/lineage-overflow.mjs'
 
 let browser, server, origin, page
 const root = resolve(import.meta.dirname, '..')
@@ -110,6 +111,56 @@ test('one new bottom Context trigger preserves focused conversation, cache indic
   assert.equal(await page.evaluate(() => window.harness.listenerCount()), 0)
   assert.deepEqual(await page.evaluate(() => window.harness.contributions.map(value => value.area)), ['statusBar.right'])
   assert.equal(await cache.evaluate(node => node.outerHTML), cacheMarkup, 'Synthetic cache indicator stays untouched')
+})
+test('decimal half-percent ties round consistently in the summary and categories', async () => {
+  await fresh()
+  await refreshWith({
+    context_max: 500000, context_used: 12750, estimated_total: 12750,
+    context_source: 'provider_usage', model: 'rounding-regression',
+    categories: [{ id: 'conversation', label: 'Conversation', tokens: 12750 }]
+  })
+  await shows('rounding-regression')
+  assert.match(await page.locator('.co-summary').innerText(), /2\.6%/)
+  assert.match(await page.locator('.co-categories').innerText(), /2\.6%/)
+  assert.equal(await page.locator('[data-cell=occupied]').count(), 3)
+})
+test('overflow warning is prominent without replacing provider occupancy or rescaling categories', async () => {
+  await fresh()
+  await refreshWith(lineageOverflow)
+  const warning = page.getByRole('alert', { name: 'Allocation reliability warning' })
+  await warning.waitFor()
+  assert.match(await warning.innerText(), /exceed the model window/)
+  assert.match(await warning.innerText(), /Hermes backend update with the context-lineage fix/)
+  assert.match(await warning.innerText(), /cannot correct backend counts/)
+  assert.equal(await warning.locator('details').count(), 0)
+  assert.equal(await warning.evaluate(node => !node.closest('details')), true)
+  assert.match(await page.locator('.co-summary').innerText(), /121,137 \/ 500,000.*24\.2%/)
+  await shows('378,863 free'); await shows('Provider-reported occupancy')
+  assert.match(await page.locator('.co-categories').innerText(), /786,899 · 157\.4%/)
+  await shows('% of window')
+  assert.equal(await page.locator('[data-cell=occupied]').count(), 24)
+  assert.equal(await page.getByText('This is estimate drift', { exact: false }).count(), 0)
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.getByRole('dialog').evaluate(node => { node.scrollTop = 0 })
+    await page.waitForTimeout(80)
+    const box = await warning.boundingBox(), panel = await page.getByRole('dialog').boundingBox()
+    assert.ok(box.y >= panel.y && box.y + box.height <= panel.y + panel.height, 'Warning visible without expanding or scrolling')
+    assert.equal(await page.getByRole('dialog').evaluate(node => node.scrollWidth === node.clientWidth), true)
+    await page.screenshot({ path: resolve(root, `.local/browser/screenshots/synthetic-lineage-overflow-${width}.png`), fullPage: true })
+  }
+  await expand('How estimates differ'); await shows('Category sum: 810,000 · Reported estimate: 810,000')
+  await refreshWith(await page.evaluate(() => window.harness.example)); await shows('81,920 free')
+  assert.equal(await warning.count(), 0, 'Refresh clears obsolete warning')
+})
+test('severe mismatch below capacity warns while ordinary mismatch does not', async () => {
+  await fresh()
+  assert.equal(await page.getByRole('alert', { name: 'Allocation reliability warning' }).count(), 0)
+  await expand('How estimates differ'); await shows('snapshot timing or a backend counting defect')
+  await refreshWith({ context_max: 1000, context_used: 200, context_source: 'provider_usage', estimated_total: 400, categories: [{ id: 'conversation', label: 'Conversation', tokens: 400 }] })
+  await shows('Category estimates disagree substantially with occupancy')
+  assert.match(await page.locator('.co-categories').innerText(), /400 · 40\.0%/)
+  assert.equal(await page.locator('[data-cell=occupied]').count(), 20)
 })
 test('truthful compact summary, category estimates and collapsed metadata disclosure', async () => {
   await fresh()

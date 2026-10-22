@@ -1,10 +1,10 @@
-# Verification boundary — 1.2.4
+# Verification boundary — 1.2.5
 
 ## Verification scope
 
-The production ESM contribution is covered by **34 JS tests: 25 Chromium behavior tests, 8 entry/normalization/privacy tests and one all-theme Chromium test**, plus **11 Python stdlib release tests**. They use real React, React Query and Radix UI **1.6.7**, matching the inspected Desktop dependency. SDK atoms/async routing/RPC/events, contribution registry, native Button/wrapper styling and host focus routing remain explicit synthetic seams. This is source/browser verification, not a live Desktop installation.
+The production ESM contribution is covered by **41 JS tests: 28 Chromium behavior tests, 12 entry/normalization/privacy tests and one all-theme Chromium test**, plus **11 Python stdlib release tests**. They use real React, React Query and Radix UI **1.6.7**, matching the inspected Desktop dependency. SDK atoms/async routing/RPC/events, contribution registry, native Button/wrapper styling and host focus routing remain explicit synthetic seams. This is source/browser verification, not a live Desktop installation.
 
-`pnpm gate` checks syntax, version/changelog consistency, JS and release tests, deterministic packaging and exact artifact content/checksums. The theme test covers all 12 built-ins / 24 native palettes at wide and narrow widths, computed text contrast, visible cells/swatches, overflow, default footer clipping and switching palettes without extra context requests. Release tests independently extract the archive and verify the explicit eight-sheet gallery, reject missing sheets and exclude unlisted images. See [approved theme evidence and limits](theme-review.md).
+`pnpm gate` checks syntax, version/changelog consistency, JS and release tests, deterministic packaging and exact artifact content/checksums. The theme test covers all 12 built-ins / 24 native palettes at wide and narrow widths, computed text contrast, visible cells/swatches, overflow, default footer clipping and switching palettes without extra context requests. Release tests independently extract the archive and verify the four explicitly allowlisted public screenshots, reject missing images and exclude unlisted images. See [approved theme evidence and limits](theme-review.md).
 
 Native tooling is separate from that portable gate:
 
@@ -53,6 +53,12 @@ The existing cross-connection regression uses the public gateway event's `connec
 
 `onCloseAutoFocus` suppresses focus return only when captured identity changes; normal Escape returns to the bottom trigger. Forced owner changes do not steal focus from the newly focused conversation. Click-to-toggle and outside dismissal are exercised. Screenshots reset internal scrolling; the synthetic shell adapts to the banner wrapping at narrow widths so the bottom bar stays within the viewport.
 
+### Allocation reliability regression
+
+A public synthetic fixture models 121,137 provider-occupancy tokens in a 500,000-token window with a 786,899-token conversation estimate and an 810,000 category sum. These are demo magnitudes, not a session export or a corrected estimate. Tests preserve 24 occupied cells, 378,863 free tokens, raw category counts and provider provenance. Overflow is checked independently for rows, sum and reported estimate, even with unknown occupancy or unsafe sums. Severe mismatch uses an exact ≥2× ratio and ≥10% window-difference floor; both directions and zero boundaries are covered. Ordinary disagreement is explained without categorically dismissing it as drift.
+
+Chromium verifies the warning is visible without disclosure expansion or scrolling at 1280px and 390px, model-window percentage labelling, unscaled >100% category shares and warning removal after a clean refresh. The plugin does not patch Hermes core: expanded-ancestor counting requires the backend context-lineage fix, whose released version is not confirmed. Exact integer ratio regression covers decimal and grid half ties.
+
 ## Visual evidence
 
 The trigger includes actual inline SVG markup (two paths, 12×12, `currentColor`, `aria-hidden`, nonfocusable). Browser assertions verify it while retaining exact accessible name Context, native trigger keyboard behavior and unchanged separate cache markup. Narrow screenshots include a running-turn lag notice alongside the breakdown.
@@ -65,6 +71,6 @@ Theme values/formulas come from the inspected runtime and are attributed in `tes
 
 - No live Desktop loader, actual native Button/wrapper styles, real connected gateway, or alternate/HUD layout qualification.
 - No installed app-root copy, enablement, hot reload, app restart, permissions/config changes, or native screenshots.
-- No GitHub CI execution, source publication, catalog change, commit or push.
+- No GitHub CI execution, source publication, catalog change or push. A local candidate commit is not publication.
 
 Before claiming native installation, the owner should read back the installed entry, enable through the native Plugins UI, and focus each of two real conversation tiles with distinct owners/budgets, then activate the same bottom Context button by pointer/keyboard. Confirm the native cache/t/s/RAM indicators are unchanged. Check switching while a request is pending, disconnect/reconnect, Escape focus return and disabling teardown. Do not restart an active session solely to obtain a screenshot. Parent review, installation and any external publication remain separate authorized steps.

@@ -2,6 +2,17 @@
 
 Versions describe source milestones; the 1.0.0–1.2.0 entries were not previously tagged GitHub releases. Dates are 2026-10-20, when these changes landed.
 
+## [1.2.5] - 2026-10-22
+
+### Fixed
+- Show a prominent allocation reliability warning when category rows/totals exceed the model window or differ severely from occupancy; stop describing every discrepancy as normal drift.
+- Preserve provider/local occupancy provenance, category counts and independent totals without rescaling. Category percentages are explicitly model-window shares, not occupancy.
+- Explain that affected gateways require a Hermes backend context-lineage fix; this plugin release does not correct expanded-ancestor counts, and no fixed backend version is confirmed yet.
+- Round safe-integer token ratios exactly at half-percent boundaries for percentages and the 100-cell grid.
+
+### Tests
+- Add public synthetic overflow, ordinary/severe mismatch, missing/unsafe values, no-rescaling and warning recovery coverage through the actual ESM and Chromium component entry.
+
 ## [1.2.4] - 2026-10-20
 
 ### Fixed
